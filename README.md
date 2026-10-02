@@ -66,9 +66,24 @@ Open that URL in Chrome on your phone or computer.
 ---
 
 ## Your Data is Private
-- All data is stored in **your browser's localStorage**
+- Property, tenant, payment and settings data is stored in **your browser's localStorage**
+- Signed agreements and imported PDFs/photos are stored in **your browser's IndexedDB**
 - Nothing is sent to any server
 - GitHub only hosts the app files, not your data
+- Use **Settings → Data Backup & Restore** regularly. Backups include saved documents and can be large.
+- Browser storage can be cleared by the browser/device. A backup is the way to move or recover your data on another device.
+
+## Rent Schedules and Reminders
+- Rent schedules list each lease period, amount paid, and remaining balance.
+- Payments can be allocated to a selected period or automatically applied oldest-first.
+- Record rent changes with their effective date; schedules and reports use the saved rate history.
+- Rent and lease reminders are calculated on this device whenever the app is opened. Browsers cannot guarantee scheduled alerts while the app is closed without an online service.
+
+## Agreements and Sharing
+- Create a lease agreement from a tenant record and collect signatures on screen, or import an externally signed PDF/photo.
+- Signed files are kept locally, can be downloaded or shared manually through the device share sheet, and are included in backups.
+- An on-screen signature records a mark but does not independently verify identity or certify legal validity.
+- Sharing to WhatsApp or another service is a user-initiated device action; the app does not connect to messaging accounts or send messages.
 
 ## Updating the App
 1. Make changes to `index.html`

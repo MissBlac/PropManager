@@ -74,7 +74,7 @@ a,button{cursor:pointer}
   overflow-y:auto;z-index:200;display:flex;flex-direction:column;
   border-right:1px solid rgba(252,209,22,.12);
 }
-.main{margin-left:var(--nav-w);flex:1;padding:28px 32px;max-width:1400px}
+.main{margin-left:var(--nav-w);flex:1;min-width:0;padding:28px 32px;max-width:1400px}
 
 /* ── SIDEBAR ── */
 .logo{
@@ -148,6 +148,7 @@ th{background:var(--bg);padding:9px 13px;text-align:left;font-size:11px;font-wei
 td{padding:12px 13px;border-bottom:1px solid var(--border);font-size:13.5px;vertical-align:middle}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:rgba(0,0,0,.015)}
+.signature-pad{display:block;width:100%;height:130px;background:#fff;border:1px solid var(--border);border-radius:8px;touch-action:none}
 
 /* ── BADGES ── */
 .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
@@ -259,6 +260,11 @@ body.dark .ps-item{background:var(--bg)}
   .form-grid{grid-template-columns:1fr}
   .ph{flex-direction:column;align-items:flex-start}
   .dash-grid{grid-template-columns:1fr}
+  .rep-charts{grid-template-columns:1fr!important}
+  #section-reports{overflow-x:clip}
+  #section-reports>.card:last-child{min-width:0;overflow:hidden}
+  #notes-grid>div:first-child{grid-template-columns:1fr!important}
+  #section-notes .row select{min-width:0;max-width:100%;flex:1}
   .main::before{display:none}
 }
 /* ── PRINT STYLES ── */
@@ -374,6 +380,7 @@ body.dark .ps-item{background:var(--bg)}
     <button class="btn btn-gold" onclick="openPayModal()">+ Record Payment</button>
   </div>
   <div class="search"><span>🔍</span><input type="text" id="rent-search" placeholder="Search tenants…" oninput="renderRent()"></div>
+  <div id="rent-schedule" class="card" style="display:none;margin-bottom:16px"></div>
   <div class="card"><div class="tbl-wrap"><table>
     <thead><tr><th>Tenant</th><th>Property</th><th>Rent Due</th><th>Lease Value</th><th>Lease Balance</th><th>Last Paid</th><th>Rent Arrears</th><th>Status</th><th></th></tr></thead>
     <tbody id="rent-body"></tbody>
@@ -382,7 +389,8 @@ body.dark .ps-item{background:var(--bg)}
 
 <!-- ── REMINDERS ── -->
 <section class="section" id="section-reminders">
-  <div class="ph"><div class="ph-left"><h2>Reminders & Alerts</h2><p>Overdue, due soon, and expiring leases</p></div></div>
+  <div class="ph"><div class="ph-left"><h2>Reminders & Alerts</h2><p>Offline schedule-based rent and lease reminders</p></div></div>
+  <p class="fs12 c-muted" style="margin-bottom:16px">Reminders are calculated on this device when you open the app. Browsers cannot guarantee scheduled alerts while the app is closed without an online service.</p>
   <div id="rem-content"></div>
 </section>
 
@@ -444,23 +452,16 @@ body.dark .ps-item{background:var(--bg)}
     <div class="ph-left"><h2>Documents & Notes</h2><p>Letters, notices and records</p></div>
     <button class="btn btn-gold" onclick="openNoteModal()">+ New Note</button>
   </div>
-  <div style="margin-bottom:20px">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-      <div class="card" style="border-top:4px solid var(--navy)">
-        <div class="card-title">📜 Legal Documents</div>
-        <p class="fs12 c-muted" style="margin-bottom:12px">Full agreements, rules and inspection forms — edit to fit your property</p>
-        <div style="display:flex;flex-direction:column;gap:7px">
-          ${LEGAL_DOCS.map((d,i)=>`<button class="btn btn-ghost btn-sm" style="justify-content:flex-start;text-align:left" onclick="useLegal(${i})">${d.icon} ${d.title}</button>`).join('')}
-        </div>
-      </div>
-      <div class="card" style="border-top:4px solid var(--gold)">
-        <div class="card-title">📨 Notice Letters</div>
-        <p class="fs12 c-muted" style="margin-bottom:12px">Ready-to-edit letters for every landlord situation</p>
-        <div style="display:flex;flex-direction:column;gap:7px">
-          ${TEMPLATES.map((t,i)=>`<button class="btn btn-ghost btn-sm" style="justify-content:flex-start;text-align:left" onclick="useTpl(${i})">${t.icon} ${t.title}</button>`).join('')}
-        </div>
-      </div>
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-title">✍ Lease Agreements & Signed Documents</div>
+    <p class="fs12 c-muted" style="margin-bottom:14px">Create an agreement for on-screen signing, or import a signed PDF or photo. Files stay on this device and are included in backups.</p>
+    <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
+      <select id="agreement-tenant" aria-label="Tenant for lease agreement"></select>
+      <button class="btn btn-gold" onclick="openAgreementSigner()">Create & Sign Agreement</button>
+      <select id="document-tenant" aria-label="Tenant for imported document"></select>
+      <label class="btn btn-ghost" style="cursor:pointer">⬆ Import Signed PDF / Photo<input type="file" accept="application/pdf,image/*" style="display:none" onchange="importTenantDocument(this)"></label>
     </div>
+    <div id="agreements-list"></div>
   </div>
   <div class="notes-grid" id="notes-grid"></div>
 </section>
@@ -482,7 +483,7 @@ body.dark .ps-item{background:var(--bg)}
     </div>
     <div class="card">
       <div class="card-title">Data Backup & Restore</div>
-      <p class="fs13 c-muted" style="margin-bottom:14px">Export a backup of all your data. You can restore it anytime on any device.</p>
+      <p class="fs13 c-muted" style="margin-bottom:14px">Export your records and saved agreements as one backup. Keep backups somewhere safe; restoring replaces records and any included documents.</p>
       <div class="row">
         <button class="btn btn-navy" onclick="exportBackup()">⬇ Export Backup</button>
         <label class="btn btn-ghost" style="cursor:pointer">⬆ Import Backup<input type="file" accept=".json" style="display:none" onchange="importBackup(this)"></label>
@@ -562,6 +563,7 @@ body.dark .ps-item{background:var(--bg)}
           </select>
         </div>
         <div class="fg"><label>Lease End <span style="font-weight:400;color:var(--muted)">(auto-filled or set manually)</span></label><input type="date" id="t-end" oninput="clearDur()"></div>
+        <div class="fg" id="t-rate-effective-wrap" style="display:none"><label>Rent change effective date</label><input type="date" id="t-rate-effective"><small class="c-muted">The new rate starts in the schedule on this date. Future increases can be entered in advance.</small></div>
         <div class="fg"><label>Security Deposit (GHS)</label><input type="number" id="t-dep" placeholder="0"></div>
         <div class="fg"><label>Status</label><select id="t-status"><option>Active</option><option>Inactive</option><option>Eviction Notice</option></select></div>
       </div>
@@ -581,6 +583,7 @@ body.dark .ps-item{background:var(--bg)}
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn btn-gold btn-sm" onclick="printCurrentReceipt()">🖨 Print Receipt</button>
+        <button class="btn btn-ghost btn-sm" onclick="shareCurrentReceipt()">↗ Share</button>
         <button class="modal-close" onclick="closeMod('m-receipt')">✕</button>
       </div>
     </div>
@@ -600,6 +603,7 @@ body.dark .ps-item{background:var(--bg)}
         <div class="fg"><label>Payment Method</label><select id="pay-meth"><option>Cash</option><option>Mobile Money</option><option>Bank Transfer</option><option>Cheque</option></select></div>
         <div class="fg"><label>Receipt / Reference No.</label><input type="text" id="pay-ref" placeholder="Optional"></div>
       </div>
+      <div class="fg"><label>Apply payment to period</label><select id="pay-period"><option value="">Auto-allocate to oldest unpaid rent</option></select></div>
       <div class="fg"><label>Notes</label><input type="text" id="pay-note" placeholder="Optional"></div>
       <div class="form-actions"><button class="btn btn-ghost" onclick="closeMod('m-pay')">Cancel</button><button class="btn btn-gold" onclick="savePay()">Save Payment</button></div>
     </div>
@@ -617,8 +621,24 @@ body.dark .ps-item{background:var(--bg)}
       </div>
     </div>
     <div class="modal-body">
-      <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Ref No.</th><th>Notes</th><th></th></tr></thead>
+      <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Amount</th><th>Allocation</th><th>Method</th><th>Ref No.</th><th>Notes</th><th></th></tr></thead>
       <tbody id="hist-body"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- Lease Agreement Signing Modal -->
+<div class="modal-bg" id="m-agreement">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-hd"><h3>Prepare & Sign Lease Agreement</h3><button class="modal-close" onclick="closeMod('m-agreement')">✕</button></div>
+    <div class="modal-body">
+      <p class="fs12 c-muted" style="margin-bottom:12px">Review the generated terms, then each party can sign below. This records signatures on this device; it does not independently verify identity or certify legal validity.</p>
+      <div class="fg"><label>Agreement terms</label><textarea id="agreement-text" style="min-height:240px"></textarea></div>
+      <div class="form-grid">
+        <div class="fg"><label>Landlord signature</label><canvas class="signature-pad" id="signature-landlord" aria-label="Landlord signature pad"></canvas><button class="btn btn-ghost btn-sm" onclick="clearSignature('signature-landlord')">Clear</button></div>
+        <div class="fg"><label>Tenant signature</label><canvas class="signature-pad" id="signature-tenant" aria-label="Tenant signature pad"></canvas><button class="btn btn-ghost btn-sm" onclick="clearSignature('signature-tenant')">Clear</button></div>
+      </div>
+      <div class="form-actions"><button class="btn btn-ghost" onclick="closeMod('m-agreement')">Cancel</button><button class="btn btn-gold" onclick="saveSignedAgreement()">Save Signed Agreement</button></div>
     </div>
   </div>
 </div>
@@ -686,6 +706,57 @@ body.dark .ps-item{background:var(--bg)}
 // ═══════════════════════════════════════════════════════════
 const K = { props:'pm_props', tens:'pm_tens', pays:'pm_pays', exps:'pm_exps', maints:'pm_maints', notes:'pm_notes', sets:'pm_sets' };
 const storageErrors = new Set();
+const DOCUMENT_DB='propmanager-documents';
+const DOCUMENT_STORE='documents';
+const MAX_DOCUMENT_BYTES=15*1024*1024;
+let _documentDbPromise;
+function documentDb() {
+  if(!('indexedDB' in window)) return Promise.reject(new Error('This browser does not support offline document storage'));
+  if(!_documentDbPromise) _documentDbPromise=new Promise((resolve,reject)=>{
+    const request=indexedDB.open(DOCUMENT_DB,1);
+    request.onupgradeneeded=()=>request.result.createObjectStore(DOCUMENT_STORE,{keyPath:'id'});
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error||new Error('Could not open document storage'));
+  });
+  return _documentDbPromise;
+}
+function documentTransaction(mode,action) {
+  return documentDb().then(db=>new Promise((resolve,reject)=>{
+    const tx=db.transaction(DOCUMENT_STORE,mode);
+    const store=tx.objectStore(DOCUMENT_STORE);
+    let result;
+    try { result=action(store) } catch(error) { reject(error); return }
+    tx.oncomplete=()=>resolve(result?.result);
+    tx.onerror=()=>reject(tx.error||new Error('Document storage transaction failed'));
+    tx.onabort=()=>reject(tx.error||new Error('Document storage transaction was aborted'));
+  }));
+}
+const saveDocumentRecord=record=>documentTransaction('readwrite',store=>store.put(record));
+const deleteDocumentRecord=id=>documentTransaction('readwrite',store=>store.delete(id));
+const allDocumentRecords=()=>documentTransaction('readonly',store=>store.getAll()).then(records=>records||[]);
+function replaceDocumentRecords(records) {
+  return documentDb().then(db=>new Promise((resolve,reject)=>{
+    const tx=db.transaction(DOCUMENT_STORE,'readwrite');
+    const store=tx.objectStore(DOCUMENT_STORE);
+    store.clear(); records.forEach(record=>store.put(record));
+    tx.oncomplete=resolve;
+    tx.onerror=()=>reject(tx.error||new Error('Could not restore saved documents'));
+    tx.onabort=()=>reject(tx.error||new Error('Document restore was aborted'));
+  }));
+}
+const readFileAsDataUrl=blob=>new Promise((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onload=()=>resolve(reader.result);
+  reader.onerror=()=>reject(reader.error||new Error('Could not read document for backup'));
+  reader.readAsDataURL(blob);
+});
+function dataUrlToBlob(dataUrl) {
+  const match=/^data:([^;,]+);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if(!match) throw new Error('Backup contains an invalid document attachment');
+  const bytes=atob(match[2]); const array=new Uint8Array(bytes.length);
+  for(let i=0;i<bytes.length;i++) array[i]=bytes.charCodeAt(i);
+  return new Blob([array],{type:match[1]});
+}
 const load = k => {
   const raw=localStorage.getItem(k);
   if(raw===null) return [];
@@ -767,12 +838,22 @@ function toast(msg, type='info') {
 // ═══════════════════════════════════════════════════════════
 const cur   = () => loadO(K.sets).currency || 'GHS';
 const fmt   = n => Number(n||0).toLocaleString('en-GH', {minimumFractionDigits:2, maximumFractionDigits:2});
-const fmtD  = d => d ? new Date(d).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) : '—';
+const fmtD  = value => {
+  if(!value) return '—';
+  const date=dateValue(value);
+  return Number.isNaN(date.getTime())?'—':date.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+};
 const today = () => {
   const now=new Date();
   return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 };
-const days  = (d1, d2) => Math.round((new Date(d2) - new Date(d1)) / 86400000);
+const days  = (d1, d2) => {
+  const day=value=>{
+    const date=dateValue(value);
+    return new Date(date.getFullYear(),date.getMonth(),date.getDate());
+  };
+  return Math.round((day(d2)-day(d1))/86400000);
+};
 const propName = id => (load(K.props).find(p => p.id === id) || {}).name || '—';
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[ch]));
 const inlineArg = value => escapeHtml(JSON.stringify(String(value ?? '')));
@@ -782,67 +863,84 @@ const parseLocalDate = value => {
   const date=new Date(Number(match[1]),Number(match[2])-1,Number(match[3]));
   return date.getFullYear()===Number(match[1]) && date.getMonth()===Number(match[2])-1 && date.getDate()===Number(match[3]) ? date : null;
 };
+const dateValue = value => value instanceof Date ? new Date(value) : typeof value==='string' ? (parseLocalDate(value)||new Date(value)) : new Date(value);
 const addMonthsClamped = (date, monthCount) => {
   const result=new Date(date.getFullYear(),date.getMonth()+monthCount,1);
   result.setDate(Math.min(date.getDate(),new Date(result.getFullYear(),result.getMonth()+1,0).getDate()));
   return result;
 };
 
+function rentPeriods(t) {
+  const start=parseLocalDate(t.leaseStart), leaseEnd=parseLocalDate(t.leaseEnd);
+  const end=leaseEnd||addMonthsClamped(new Date(),12);
+  if(!start || (t.leaseEnd&&!leaseEnd) || end<start) return [];
+  const history=[{effectiveDate:t.leaseStart,rentAmount:Number(t.rentAmount),rentFrequency:t.rentFrequency||'Monthly'},...(Array.isArray(t.rentHistory)?t.rentHistory:[])]
+    .filter(entry=>parseLocalDate(entry.effectiveDate)&&Number.isFinite(Number(entry.rentAmount))&&Number(entry.rentAmount)>0)
+    .sort((a,b)=>a.effectiveDate.localeCompare(b.effectiveDate));
+  const rateAt=date=>{
+    let rate=history[0];
+    history.forEach(entry=>{if(entry.effectiveDate<=date) rate=entry});
+    return rate;
+  };
+  const periods=[];
+  let cursor=start, anchor=start, interval=0, previousMonths=0;
+  for(let i=0;i<1200&&cursor<=end;i++) {
+    const date=`${cursor.getFullYear()}-${String(cursor.getMonth()+1).padStart(2,'0')}-${String(cursor.getDate()).padStart(2,'0')}`;
+    const rate=rateAt(date);
+    const months=rate.rentFrequency==='Quarterly'?3:rate.rentFrequency==='Annually'?12:1;
+    if(months!==previousMonths){anchor=cursor;interval=0;previousMonths=months}
+    periods.push({start:date,due:cursor,amount:Number(rate.rentAmount),frequency:rate.rentFrequency||'Monthly'});
+    interval++;
+    const next=addMonthsClamped(anchor,interval*months);
+    if(next<=cursor) break;
+    cursor=next;
+  }
+  const payments=load(K.pays).filter(payment=>payment.tenantId===t.id)
+    .sort((a,b)=>String(a.datePaid).localeCompare(String(b.datePaid))||String(a.id).localeCompare(String(b.id)));
+  payments.forEach(payment=>{
+    let remaining=Number(payment.amount)||0;
+    const requested=payment.allocationPeriod;
+    const first=requested?periods.findIndex(period=>period.start===requested):0;
+    const order=first>=0?periods.slice(first):periods;
+    order.forEach(period=>{
+      if(remaining<=0) return;
+      const available=period.amount-(period.paid||0);
+      if(available<=0) return;
+      const allocated=Math.min(available,remaining);
+      period.paid=(period.paid||0)+allocated;
+      remaining-=allocated;
+    });
+  });
+  return periods.map(period=>({
+    ...period,
+    paid:period.paid||0,
+    balance:period.amount-(period.paid||0),
+    dueNow:period.due<=new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())
+  }));
+}
+
 function tenStatus(t) {
   const pays    = load(K.pays).filter(p => p.tenantId === t.id);
   const total   = pays.reduce((s,p) => s + Number(p.amount), 0);
   const start   = parseLocalDate(t.leaseStart);
-  const now     = new Date();
-
-  // Use the earlier of today or lease end — don't charge beyond the lease period
   const leaseEndDate=parseLocalDate(t.leaseEnd);
-  const endRef  = (leaseEndDate && leaseEndDate < new Date(now.getFullYear(),now.getMonth(),now.getDate())) ? leaseEndDate : now;
-
-  const freqMo  = t.rentFrequency === 'Monthly' ? 1 : t.rentFrequency === 'Quarterly' ? 3 : 12;
-
-  // Correct elapsed: full calendar months completed (no +1 inflation)
-  const monthsElapsed = (endRef.getFullYear() - start.getFullYear()) * 12
-                      + (endRef.getMonth() - start.getMonth());
-  // Count current partial period as a full one (rent is due at start of each period)
-  const elapsed  = now < start ? 0 : Math.max(1, Math.ceil(monthsElapsed / freqMo));
-  const expected = Number(t.rentAmount) * elapsed;
-  const balance  = expected - total;
-
-  // Total lease value (full contract, regardless of today)
+  const schedule=rentPeriods(t);
+  const duePeriods=schedule.filter(period=>period.dueNow);
+  const expected=duePeriods.reduce((sum,period)=>sum+period.amount,0);
+  const balance=duePeriods.reduce((sum,period)=>sum+Math.max(0,period.balance),0);
   const leaseMonths = start && leaseEndDate
     ? Math.round((Date.UTC(leaseEndDate.getFullYear(),leaseEndDate.getMonth(),leaseEndDate.getDate())-Date.UTC(start.getFullYear(),start.getMonth(),start.getDate()))/(86400000*30.4375))
     : null;
-  const leaseTotal  = leaseMonths !== null && leaseMonths >= 0 ? Number(t.rentAmount) * Math.max(1,Math.ceil(leaseMonths / freqMo)) : null;
+  const leaseTotal  = leaseMonths !== null && leaseMonths >= 0 ? schedule.reduce((sum,period)=>sum+period.amount,0) : null;
 
-  const lastPay  = [...pays].sort((a,b) => new Date(b.datePaid)-new Date(a.datePaid))[0];
-  return { total, expected, balance, pays, lastPay, leaseTotal, leaseMonths };
+  const lastPay  = [...pays].sort((a,b) => String(b.datePaid).localeCompare(String(a.datePaid)))[0];
+  return { total, expected, balance, pays, lastPay, leaseTotal, leaseMonths, schedule };
 }
 
 function dueSoon(t) {
-  if (!t.leaseStart) return false;
-  const leaseEnd=parseLocalDate(t.leaseEnd);
-  const todayStart=new Date(); todayStart.setHours(0,0,0,0);
-  if (leaseEnd && leaseEnd < todayStart) return false;
-
-  const start = parseLocalDate(t.leaseStart);
-  if(!start) return false;
-
-  const freqMo = t.rentFrequency === 'Monthly' ? 1
-               : t.rentFrequency === 'Quarterly' ? 3 : 12;
-  let nextDue=start;
-  if(start < todayStart) {
-    const monthsElapsed = (todayStart.getFullYear() - start.getFullYear()) * 12
-                        + (todayStart.getMonth() - start.getMonth());
-    let cyclesDone=Math.max(0,Math.floor(monthsElapsed/freqMo));
-    nextDue=addMonthsClamped(start,cyclesDone*freqMo);
-    while(nextDue < todayStart) {
-      cyclesDone++;
-      nextDue=addMonthsClamped(start,cyclesDone*freqMo);
-    }
-  }
-  if(leaseEnd && nextDue > leaseEnd) return false;
-  const daysUntil = Math.round((nextDue - todayStart) / 86400000);
-  return daysUntil >= 0 && daysUntil <= 7;
+  const todayStart=new Date();todayStart.setHours(0,0,0,0);
+  const lastDay=new Date(todayStart.getFullYear(),todayStart.getMonth(),todayStart.getDate()+7);
+  return rentPeriods(t).some(period=>period.balance>0&&period.due>=todayStart&&period.due<=lastDay);
 }
 
 function fillPropDrops() {
@@ -862,8 +960,8 @@ function renderDash() {
   const exps   = load(K.exps);
   const c      = escapeHtml(cur());
 
-  const mPays = pays.filter(p => { const d=new Date(p.datePaid); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear() });
-  const mExps = exps.filter(e => { const d=new Date(e.date); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear() });
+  const mPays = pays.filter(p => { const d=dateValue(p.datePaid); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear() });
+  const mExps = exps.filter(e => { const d=dateValue(e.date); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear() });
   const mInc  = mPays.reduce((s,p)=>s+Number(p.amount),0);
   const mExp  = mExps.reduce((s,e)=>s+Number(e.amount),0);
   let overdue = 0; tens.forEach(t => { if (tenStatus(t).balance > 0) overdue++ });
@@ -883,7 +981,7 @@ function renderDash() {
     const property=escapeHtml(propName(t.propertyId));
     if (balance > 0) { alerts.push(`<div class="alert alert-red">⚠ <strong>${name}</strong> (${property}) — <strong>${c} ${fmt(balance)}</strong> overdue</div>`); count++ }
     else if (dueSoon(t)) { alerts.push(`<div class="alert alert-warn">🔔 <strong>${name}</strong>'s rent is due within 7 days</div>`); count++ }
-    if (t.leaseEnd) { const d=days(now,new Date(t.leaseEnd)); if(d>=0&&d<=30){ alerts.push(`<div class="alert alert-blue">📋 <strong>${name}</strong>'s lease expires in <strong>${d} day(s)</strong> — ${fmtD(t.leaseEnd)}</div>`); count++ } }
+    if (t.leaseEnd) { const d=days(now,t.leaseEnd); if(d>=0&&d<=30){ alerts.push(`<div class="alert alert-blue">📋 <strong>${name}</strong>'s lease expires in <strong>${d} day(s)</strong> — ${fmtD(t.leaseEnd)}</div>`); count++ } }
   });
   document.getElementById('nb-dash').textContent = count; document.getElementById('nb-dash').style.display = count ? '' : 'none';
   document.getElementById('nb-rem').textContent  = count; document.getElementById('nb-rem').style.display  = count ? '' : 'none';
@@ -891,15 +989,15 @@ function renderDash() {
 
   // Recent payments
   const allTens = load(K.tens);
-  const recent = [...pays].sort((a,b)=>new Date(b.datePaid)-new Date(a.datePaid)).slice(0,6);
+  const recent = [...pays].sort((a,b)=>String(b.datePaid).localeCompare(String(a.datePaid))).slice(0,6);
   document.getElementById('dash-payments').innerHTML = recent.length
     ? `<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Amount</th><th>Date</th></tr></thead><tbody>${recent.map(p=>{ const t=allTens.find(x=>x.id===p.tenantId); return `<tr><td class="fw7">${escapeHtml(t?.name||'—')}</td><td class="c-ok fw7">${c} ${fmt(p.amount)}</td><td>${fmtD(p.datePaid)}</td></tr>` }).join('')}</tbody></table></div>`
     : '<p class="c-muted fs13">No payments recorded yet.</p>';
 
   // Lease expiry
-  const expiring = load(K.tens).filter(t=>{ if(!t.leaseEnd) return false; const d=days(now,new Date(t.leaseEnd)); return d>=0&&d<=60 }).sort((a,b)=>new Date(a.leaseEnd)-new Date(b.leaseEnd));
+  const expiring = load(K.tens).filter(t=>{ if(!t.leaseEnd) return false; const d=days(now,t.leaseEnd); return d>=0&&d<=60 }).sort((a,b)=>String(a.leaseEnd).localeCompare(String(b.leaseEnd)));
   document.getElementById('dash-leases').innerHTML = expiring.length
-    ? `<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Expires</th><th>Days</th></tr></thead><tbody>${expiring.map(t=>{ const d=days(now,new Date(t.leaseEnd)); return `<tr><td class="fw7">${escapeHtml(t.name)}</td><td>${fmtD(t.leaseEnd)}</td><td class="${d<=7?'c-bad':d<=30?'c-warn':''} fw7">${d}d</td></tr>` }).join('')}</tbody></table></div>`
+    ? `<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Expires</th><th>Days</th></tr></thead><tbody>${expiring.map(t=>{ const d=days(now,t.leaseEnd); return `<tr><td class="fw7">${escapeHtml(t.name)}</td><td>${fmtD(t.leaseEnd)}</td><td class="${d<=7?'c-bad':d<=30?'c-warn':''} fw7">${d}d</td></tr>` }).join('')}</tbody></table></div>`
     : '<p class="c-muted fs13">No leases expiring within 60 days.</p>';
 }
 
@@ -971,11 +1069,16 @@ function openTenModal(id) {
   ['t-id','t-name','t-phone','t-email','t-gid','t-ecname','t-ecphone','t-unit','t-rent','t-start','t-end','t-dep','t-notes'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('t-dur').value='';
   document.getElementById('t-freq').value='Monthly'; document.getElementById('t-status').value='Active';
+  document.getElementById('t-rate-effective-wrap').style.display='none';
+  document.getElementById('t-rate-effective').value=today();
   document.getElementById('m-ten-title').textContent='Add Tenant';
   _origRent=0; _origLeaseEnd=''; _origFreq='';
   fillPropDrops();
   if (id) {
     const t=load(K.tens).find(x=>x.id===id); if(!t) return;
+    document.getElementById('t-rate-effective-wrap').style.display='block';
+    document.getElementById('t-rate-effective').min=t.leaseStart||'';
+    if(t.leaseStart>today())document.getElementById('t-rate-effective').value=t.leaseStart;
     _origRent    = Number(t.rentAmount);
     _origLeaseEnd= t.leaseEnd || '';
     _origFreq    = t.rentFrequency;
@@ -1022,9 +1125,27 @@ function saveTen() {
   const newEnd=document.getElementById('t-end').value;
   const newRent=Number(rent);
   const newFreq=document.getElementById('t-freq').value;
+  const previous=arr.find(x=>x.id===id);
+  const rateEffective=document.getElementById('t-rate-effective').value||today();
+  const existingRate=previous?.rentHistory?.find(rate=>rate.effectiveDate===rateEffective);
+  const rateChanged=!!previous&&(
+    newRent!==Number(previous.rentAmount)||newFreq!==previous.rentFrequency||
+    !!existingRate&&(newRent!==Number(existingRate.rentAmount)||newFreq!==existingRate.rentFrequency)
+  );
   const startDate=parseLocalDate(start);
   const endDate=newEnd?parseLocalDate(newEnd):null;
   if(!startDate||(newEnd && !endDate)||(endDate && endDate<startDate)){ toast('Lease end date must be on or after the start date','err'); return }
+  if(rateChanged&&(!parseLocalDate(rateEffective)||rateEffective<start)){toast('Rent change date must be valid and on or after the lease start','err');return}
+
+  let rentHistory=Array.isArray(previous?.rentHistory)?[...previous.rentHistory]:[];
+  if(previous&&!rentHistory.length) rentHistory.push({effectiveDate:previous.leaseStart||start,rentAmount:Number(previous.rentAmount),rentFrequency:previous.rentFrequency||'Monthly'});
+  if(rateChanged) {
+    rentHistory=rentHistory.filter(rate=>rate.effectiveDate!==rateEffective);
+    rentHistory.push({effectiveDate:rateEffective,rentAmount:newRent,rentFrequency:newFreq});
+  } else if(!previous) rentHistory=[{effectiveDate:start,rentAmount:newRent,rentFrequency:newFreq}];
+  rentHistory.sort((a,b)=>a.effectiveDate.localeCompare(b.effectiveDate));
+  const activeRate=[...rentHistory].reverse().find(rate=>rate.effectiveDate<=today())||{rentAmount:newRent,rentFrequency:newFreq};
+  const currentRent=Number(activeRate.rentAmount), currentFrequency=activeRate.rentFrequency;
 
   const ob={ id:id||uid(), name, phone,
     email:document.getElementById('t-email').value,
@@ -1032,7 +1153,8 @@ function saveTen() {
     ecName:document.getElementById('t-ecname').value,
     ecPhone:document.getElementById('t-ecphone').value,
     propertyId:prop, unit:document.getElementById('t-unit').value,
-    rentAmount:newRent, rentFrequency:newFreq,
+    rentAmount:currentRent, rentFrequency:currentFrequency,
+    rentHistory,
     leaseStart:start, leaseEnd:newEnd,
     deposit:document.getElementById('t-dep').value,
     status:document.getElementById('t-status').value,
@@ -1043,7 +1165,8 @@ function saveTen() {
   if(id){ const i=arr.findIndex(x=>x.id===id); arr[i]=ob } else arr.push(ob);
   save(K.tens,arr);
   closeMod('m-ten');
-  renderTenants();
+  renderTenants();renderDash();renderRent();renderRem();
+  if(document.getElementById('section-reports').classList.contains('active'))renderReports();
 
   // ── Detect what changed and auto-generate the right document ──
   const isEdit       = !!id;
@@ -1056,7 +1179,7 @@ function saveTen() {
     setTimeout(()=>genLeaseRenewalNotice(ob, _origLeaseEnd, _origRent), 400);
   } else if (rentRaised) {
     toast('Rent increase detected — preparing notice…','info');
-    setTimeout(()=>genRentIncreaseNotice(ob, _origRent), 400);
+    setTimeout(()=>genRentIncreaseNotice({...ob,rentAmount:newRent,rentFrequency:newFreq}, _origRent, rateEffective), 400);
   } else if (leaseRenewed) {
     toast('Lease renewal detected — preparing notice…','info');
     setTimeout(()=>genLeaseRenewalNotice(ob, _origLeaseEnd, _origRent), 400);
@@ -1065,14 +1188,14 @@ function saveTen() {
   }
 }
 
-function genRentIncreaseNotice(tenant, oldRent) {
+function genRentIncreaseNotice(tenant, oldRent, effectiveDate=today()) {
   const s    = loadO(K.sets);
   const biz  = s.businessName || 'Your Name / Business Name';
   const c    = s.currency || 'GHS';
   const prop = load(K.props).find(p=>p.id===tenant.propertyId);
   const loc  = `${prop?.name||''}${tenant.unit?' / '+tenant.unit:''}`;
   const todayStr = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
-  const effDate  = fmtD(new Date(Date.now()+30*86400000).toISOString().split('T')[0]);
+  const effDate  = fmtD(effectiveDate);
 
   const body=
 `Dear ${tenant.name},
@@ -1154,7 +1277,9 @@ ${todayStr}`;
 
 function delTen(id) {
   if(!confirm('Delete this tenant?')) return;
-  save(K.tens, load(K.tens).filter(t=>t.id!==id)); renderTenants(); toast('Tenant removed','warn');
+  save(K.tens, load(K.tens).filter(t=>t.id!==id));renderTenants();renderDash();renderRent();renderRem();
+  if(document.getElementById('section-reports').classList.contains('active'))renderReports();
+  toast('Tenant removed','warn');
 }
 
 function renderTenants() {
@@ -1196,17 +1321,28 @@ function openPayModal(tenId) {
   document.getElementById('pay-date').value=today(); document.getElementById('pay-meth').value='Cash';
   const tens=load(K.tens).filter(t=>t.status==='Active');
   document.getElementById('pay-ten').innerHTML=tens.map(t=>`<option value="${escapeHtml(t.id)}" ${t.id===tenId?'selected':''}>${escapeHtml(t.name)} — ${escapeHtml(propName(t.propertyId))}</option>`).join('');
+  document.getElementById('pay-ten').onchange=refreshPaymentPeriods;
+  refreshPaymentPeriods();
   openMod('m-pay');
 }
 
 let _lastPayId = '';
+let _activeScheduleTenantId='';
+function refreshPaymentPeriods() {
+  const tenant=load(K.tens).find(t=>t.id===document.getElementById('pay-ten').value);
+  const select=document.getElementById('pay-period');
+  if(!select) return;
+  const periods=tenant?rentPeriods(tenant):[];
+  select.innerHTML='<option value="">Auto-allocate to oldest unpaid rent</option>'+periods.filter(period=>period.balance>0).map(period=>`<option value="${escapeHtml(period.start)}">${escapeHtml(fmtD(period.start))} — ${escapeHtml(cur())} ${fmt(period.amount)} due${period.dueNow?'':' (future)'}</option>`).join('');
+}
+
 function savePay() {
   const tenId=document.getElementById('pay-ten').value;
   const amt=document.getElementById('pay-amt').value;
   const date=document.getElementById('pay-date').value;
   if(!tenId||!amt||!parseLocalDate(date)||!Number.isFinite(Number(amt))||Number(amt)<=0){ toast('Enter a payment amount greater than zero and a valid payment date','err'); return }
   const arr=load(K.pays);
-  const newPay={ id:uid(), tenantId:tenId, amount:Number(amt), datePaid:date, method:document.getElementById('pay-meth').value, receiptNo:document.getElementById('pay-ref').value||('RCT-'+Date.now().toString(36).toUpperCase()), notes:document.getElementById('pay-note').value, createdAt:new Date().toISOString() };
+  const newPay={ id:uid(), tenantId:tenId, amount:Number(amt), datePaid:date, allocationPeriod:document.getElementById('pay-period').value||'', method:document.getElementById('pay-meth').value, receiptNo:document.getElementById('pay-ref').value||('RCT-'+Date.now().toString(36).toUpperCase()), notes:document.getElementById('pay-note').value, createdAt:new Date().toISOString() };
   arr.push(newPay);
   save(K.pays,arr);
   _lastPayId = newPay.id;
@@ -1215,6 +1351,8 @@ function savePay() {
   renderRent();
   renderTenants();
   renderRem();
+  if(document.getElementById('section-reports').classList.contains('active'))renderReports();
+  if(_activeScheduleTenantId===tenId) showSchedule(tenId);
   // Auto-show receipt
   const tenant=load(K.tens).find(t=>t.id===tenId);
   const prop=load(K.props).find(p=>p.id===tenant?.propertyId);
@@ -1227,22 +1365,44 @@ function printCurrentReceipt() {
   if(_lastPayId) printReceipt(_lastPayId);
 }
 
+async function shareCurrentReceipt() {
+  if(!_lastPayId) return;
+  const payment=load(K.pays).find(item=>item.id===_lastPayId);
+  const tenant=load(K.tens).find(item=>item.id===payment?.tenantId);
+  if(!payment||!tenant){toast('Receipt details are unavailable','err');return}
+  const text=`RENT PAYMENT RECEIPT\n${loadO(K.sets).businessName||'Property Manager'}\nTenant: ${tenant.name}\nProperty: ${propName(tenant.propertyId)}${tenant.unit?` / ${tenant.unit}`:''}\nAmount: ${cur()} ${fmt(payment.amount)}\nDate: ${fmtD(payment.datePaid)}\nMethod: ${payment.method}\nReceipt: ${payment.receiptNo||'—'}${payment.allocationPeriod?`\nApplied to: ${fmtD(payment.allocationPeriod)}`:''}`;
+  const property=load(K.props).find(item=>item.id===tenant.propertyId);
+  const receiptFile=new File([`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Rent Receipt</title><body style="font-family:Arial,sans-serif;max-width:680px;margin:30px auto;padding:20px">${receiptHTML(payment,tenant,property,loadO(K.sets))}</body></html>`],`receipt-${payment.receiptNo||payment.id}.html`,{type:'text/html'});
+  if(navigator.share) {
+    try {
+      if(navigator.canShare&&navigator.canShare({files:[receiptFile]})) await navigator.share({title:'Rent payment receipt',files:[receiptFile]});
+      else await navigator.share({title:'Rent payment receipt',text});
+    }
+    catch(error) { if(error.name!=='AbortError'){console.error('Receipt sharing failed',error);toast('Could not open the share sheet','err')} }
+    return;
+  }
+  const link=document.createElement('a');link.href=URL.createObjectURL(receiptFile);link.download=receiptFile.name;link.click();
+  setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+  toast('Receipt downloaded; share it from your device','ok');
+}
+
 let _histTenId = '';
 function showHist(tenId) {
   _histTenId = tenId;
   const t=load(K.tens).find(x=>x.id===tenId);
-  const pays=[...load(K.pays).filter(p=>p.tenantId===tenId)].sort((a,b)=>new Date(b.datePaid)-new Date(a.datePaid));
+  const pays=[...load(K.pays).filter(p=>p.tenantId===tenId)].sort((a,b)=>String(b.datePaid).localeCompare(String(a.datePaid)));
   const c=escapeHtml(cur());
   document.getElementById('m-hist-title').textContent=`Payment History — ${t?.name}`;
   document.getElementById('hist-body').innerHTML = pays.length ? pays.map(p=>`
     <tr>
       <td>${fmtD(p.datePaid)}</td><td class="fw7 c-ok">${c} ${fmt(p.amount)}</td>
+      <td>${p.allocationPeriod?escapeHtml(fmtD(p.allocationPeriod)):'Auto (oldest due)'}</td>
       <td>${escapeHtml(p.method)}</td><td>${escapeHtml(p.receiptNo||'—')}</td><td>${escapeHtml(p.notes||'—')}</td>
       <td><div class="row">
         <button class="btn btn-navy btn-sm" onclick="printReceipt(${inlineArg(p.id)})">🧾</button>
         <button class="btn btn-red btn-sm" onclick="delPay(${inlineArg(p.id)})">🗑</button>
       </div></td>
-    </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">No payments recorded.</td></tr>`;
+    </tr>    `).join('') : `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">No payments recorded.</td></tr>`;
   openMod('m-hist');
 }
 
@@ -1253,6 +1413,8 @@ function delPay(id) {
   renderRent();
   renderTenants();
   renderRem();
+  if(document.getElementById('section-reports').classList.contains('active'))renderReports();
+  if(load(K.tens).some(tenant=>tenant.id===_activeScheduleTenantId)) showSchedule(_activeScheduleTenantId);
   closeMod('m-hist'); toast('Payment deleted','warn');
 }
 
@@ -1306,7 +1468,7 @@ function receiptHTML(pay, tenant, prop, s, single=true) {
         <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Phone</span><br><strong>${tenantPhone}</strong></div>
         <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Property</span><br><strong>${propNameText}</strong></div>
         <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Unit / Room</span><br><strong>${unitText}</strong></div>
-        <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Payment For</span><br><strong>Rent — ${new Date(pay.datePaid).toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</strong></div>
+        <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Rent Allocation</span><br><strong>${pay.allocationPeriod?`Period starting ${escapeHtml(fmtD(pay.allocationPeriod))}`:'Oldest unpaid periods (auto)'}</strong></div>
         <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Payment Method</span><br><strong>${escapeHtml(pay.method)}</strong></div>
       </div>
       <div style="background:#f0a500;border-radius:8px;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -1352,7 +1514,7 @@ function printReceipt(payId) {
 
 function printAllReceipts() {
   if(!_histTenId){toast('No tenant selected','err');return}
-  const pays=[...load(K.pays).filter(p=>p.tenantId===_histTenId)].sort((a,b)=>new Date(b.datePaid)-new Date(a.datePaid));
+  const pays=[...load(K.pays).filter(p=>p.tenantId===_histTenId)].sort((a,b)=>String(b.datePaid).localeCompare(String(a.datePaid)));
   if(!pays.length){toast('No payments to print','warn');return}
   const tenant=load(K.tens).find(t=>t.id===_histTenId);
   const prop=load(K.props).find(p=>p.id===tenant?.propertyId);
@@ -1402,9 +1564,30 @@ function renderRent() {
       <td>${lastPay ? fmtD(lastPay.datePaid) : '<span class="c-muted">Never</span>'}</td>
       <td class="${balance>0?'c-bad':'c-ok'} fw7">${balance>0?'+':''}${c} ${fmt(Math.abs(balance))}</td>
       <td><span class="badge ${stCls}">${stLbl}</span></td>
-      <td><div class="row"><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">+ Pay</button><button class="btn btn-ghost btn-sm" onclick="showHist(${inlineArg(t.id)})">📋</button></div></td>
+      <td><div class="row"><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">+ Pay</button><button class="btn btn-ghost btn-sm" onclick="showSchedule(${inlineArg(t.id)})">Schedule</button><button class="btn btn-ghost btn-sm" onclick="showHist(${inlineArg(t.id)})">📋</button></div></td>
     </tr>`
   }).join('') : `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">No active tenants.</td></tr>`;
+}
+
+function showSchedule(tenantId) {
+  const tenant=load(K.tens).find(item=>item.id===tenantId);
+  if(!tenant) return;
+  const schedule=rentPeriods(tenant);
+  const rateHistory=Array.isArray(tenant.rentHistory)&&tenant.rentHistory.length
+    ?tenant.rentHistory
+    :[{effectiveDate:tenant.leaseStart,rentAmount:tenant.rentAmount,rentFrequency:tenant.rentFrequency}];
+  const container=document.getElementById('rent-schedule');
+  _activeScheduleTenantId=tenantId;
+  container.style.display='block';
+  const unpaid=schedule.filter(period=>period.balance>0);
+  container.innerHTML=`<div class="ph"><div class="ph-left"><h3>Payment Schedule — ${escapeHtml(tenant.name)}</h3><p>Payments allocate oldest-first unless assigned to a period. Reminders update when the app is open.</p></div><button class="btn btn-ghost btn-sm" onclick="_activeScheduleTenantId='';document.getElementById('rent-schedule').style.display='none'">Close</button></div>
+    <details style="margin-bottom:12px"><summary class="fs13 fw7" style="cursor:pointer">Rent change history</summary><div class="tbl-wrap" style="margin-top:8px"><table><thead><tr><th>Effective from</th><th>Rent</th><th>Frequency</th></tr></thead><tbody>${[...rateHistory].sort((a,b)=>a.effectiveDate.localeCompare(b.effectiveDate)).map(rate=>`<tr><td>${escapeHtml(fmtD(rate.effectiveDate))}</td><td>${escapeHtml(cur())} ${fmt(rate.rentAmount)}</td><td>${escapeHtml(rate.rentFrequency)}</td></tr>`).join('')}</tbody></table></div></details>
+    <div class="tbl-wrap"><table><thead><tr><th>Period</th><th>Due</th><th>Rent</th><th>Paid</th><th>Remaining</th><th>Status</th></tr></thead><tbody>${schedule.map(period=>{
+      const due=period.dueNow, state=period.balance<=0?'Paid':due?'Due':'Upcoming';
+      return `<tr><td>${escapeHtml(fmtD(period.start))} · ${escapeHtml(period.frequency)}</td><td>${escapeHtml(fmtD(period.start))}</td><td>${escapeHtml(cur())} ${fmt(period.amount)}</td><td>${escapeHtml(cur())} ${fmt(period.paid)}</td><td class="${period.balance>0?'c-bad':'c-ok'}">${escapeHtml(cur())} ${fmt(Math.max(0,period.balance))}</td><td><span class="badge ${state==='Paid'?'b-green':state==='Due'?'b-red':'b-blue'}">${state}</span></td></tr>`;
+    }).join('')}</tbody></table></div>
+    <p class="fs12 c-muted" style="margin-top:10px">Remaining across lease: ${escapeHtml(cur())} ${fmt(unpaid.reduce((sum,period)=>sum+period.balance,0))} · ${unpaid.length} unpaid periods</p>`;
+  container.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1415,10 +1598,14 @@ function renderRem() {
   const now=new Date(); const c=escapeHtml(cur());
   let overdue=[], soon=[], expiring=[];
   tens.forEach(t => {
-    const { balance }=tenStatus(t);
-    if(balance>0) overdue.push(t);
-    else if(dueSoon(t)) soon.push(t);
-    if(t.leaseEnd){ const d=days(now,new Date(t.leaseEnd)); if(d>=0&&d<=30) expiring.push({...t,dLeft:d}) }
+    const schedule=rentPeriods(t);
+    const todayDate=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    const late=schedule.filter(period=>period.balance>0&&period.due<=todayDate);
+    const upcoming=schedule.filter(period=>period.balance>0&&period.due>todayDate&&period.due<=new Date(todayDate.getFullYear(),todayDate.getMonth(),todayDate.getDate()+7));
+    if(late.length) overdue.push({...t,latePeriods:late,lateBalance:late.reduce((sum,period)=>sum+period.balance,0)});
+    if(upcoming.length) soon.push({...t,upcomingPeriods:upcoming});
+    const leaseEnd=parseLocalDate(t.leaseEnd); const dLeft=leaseEnd?days(todayDate,leaseEnd):null;
+    if(dLeft!==null&&dLeft>=0&&dLeft<=30) expiring.push({...t,dLeft});
   });
 
   const section=(title,icon,col,items,rowFn)=>`
@@ -1431,16 +1618,17 @@ function renderRem() {
 
   document.getElementById('rem-content').innerHTML =
     section('Overdue Rent','⚠','var(--bad)',overdue, t=>{
-      const {balance, leaseTotal}=tenStatus(t);
       const safeName=escapeHtml(t.name);
       const safePhone=escapeHtml(t.phone || '');
       const safeProp=escapeHtml(propName(t.propertyId));
-      return `<tr><td><div class="fw7">${safeName}</div><div class="fs12 c-muted">${safePhone}</div></td><td>${safeProp}</td><td class="c-bad fw7">${c} ${fmt(balance)} owed${leaseTotal?` <span class="fs12 c-muted">/ ${c} ${fmt(leaseTotal)} total lease</span>`:''}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">Record Payment</button></td></tr>`;
+      const dueList=t.latePeriods.map(period=>fmtD(period.start)).join(', ');
+      return `<tr><td><div class="fw7">${safeName}</div><div class="fs12 c-muted">${safePhone}</div></td><td>${safeProp}</td><td class="c-bad fw7">${c} ${fmt(t.lateBalance)} overdue across ${t.latePeriods.length} period(s)<div class="fs12 c-muted">${escapeHtml(dueList)}</div></td><td><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">Record Payment</button></td></tr>`;
     })+
     section('Due Within 7 Days','🔔','var(--warn)',soon, t=>{
       const safeName=escapeHtml(t.name);
       const safeProp=escapeHtml(propName(t.propertyId));
-      return `<tr><td class="fw7">${safeName}</td><td>${safeProp}</td><td>${c} ${fmt(t.rentAmount)} / ${escapeHtml(t.rentFrequency)}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">Record Payment</button></td></tr>`;
+      const next=t.upcomingPeriods[0];
+      return `<tr><td class="fw7">${safeName}</td><td>${safeProp}</td><td>${c} ${fmt(next.balance)} remaining for ${escapeHtml(fmtD(next.start))}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">Record Payment</button></td></tr>`;
     })+
     section('Leases Expiring Within 30 Days','📋','var(--navy)',expiring, t=>{
       const safeName=escapeHtml(t.name);
@@ -1482,10 +1670,10 @@ function delExp(id) {
 }
 
 function renderExp() {
-  const exps=[...load(K.exps)].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const exps=[...load(K.exps)].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   const now=new Date(); const c=escapeHtml(cur());
-  const mE=exps.filter(e=>{const d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()});
-  const yE=exps.filter(e=>new Date(e.date).getFullYear()===now.getFullYear());
+  const mE=exps.filter(e=>{const d=dateValue(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()});
+  const yE=exps.filter(e=>dateValue(e.date).getFullYear()===now.getFullYear());
   document.getElementById('exp-stats').innerHTML=`
     <div class="stat-card"><div class="stat-ic ic-red">📅</div><div><div class="stat-val">${c} ${fmt(mE.reduce((s,e)=>s+Number(e.amount),0))}</div><div class="stat-lbl">This Month</div></div></div>
     <div class="stat-card"><div class="stat-ic ic-navy">📆</div><div><div class="stat-val">${c} ${fmt(yE.reduce((s,e)=>s+Number(e.amount),0))}</div><div class="stat-lbl">This Year</div></div></div>
@@ -1545,7 +1733,7 @@ function delMaint(id) {
 }
 
 function renderMaint() {
-  let list=[...load(K.maints)].sort((a,b)=>new Date(b.dateReported)-new Date(a.dateReported));
+  let list=[...load(K.maints)].sort((a,b)=>String(b.dateReported).localeCompare(String(a.dateReported)));
   if(mFilt!=='all') list=list.filter(m=>m.status===mFilt);
   const c=escapeHtml(cur());
   const priBdg=p=>p==='Emergency'?'b-red':p==='High'?'b-warn':p==='Medium'?'b-blue':'b-gray';
@@ -1578,8 +1766,8 @@ function renderReports() {
   const sel=document.getElementById('rep-year'); const nowY=new Date().getFullYear();
   if(!sel.options.length) for(let y=nowY;y>=nowY-4;y--){ const o=document.createElement('option'); o.value=y; o.textContent=y; sel.appendChild(o) }
   const year=parseInt(sel.value)||nowY;
-  const pays=load(K.pays).filter(p=>new Date(p.datePaid).getFullYear()===year);
-  const exps=load(K.exps).filter(e=>new Date(e.date).getFullYear()===year);
+  const pays=load(K.pays).filter(p=>dateValue(p.datePaid).getFullYear()===year);
+  const exps=load(K.exps).filter(e=>dateValue(e.date).getFullYear()===year);
   const tens=load(K.tens).filter(t=>t.status==='Active');
   const props=load(K.props);
   const c=escapeHtml(cur());
@@ -1587,9 +1775,11 @@ function renderReports() {
   const totInc=pays.reduce((s,p)=>s+Number(p.amount),0);
   const totExp=exps.reduce((s,e)=>s+Number(e.amount),0);
   const net=totInc-totExp;
-  const annualRent=t=>Number(t.rentAmount)*(12/(t.rentFrequency==='Quarterly'?3:t.rentFrequency==='Annually'?12:1));
-  const annualExpected=tens.reduce((s,t)=>s+annualRent(t),0);
-  const moRent=annualExpected/12;
+  const expectedByMonth=Array(12).fill(0);
+  tens.forEach(tenant=>rentPeriods(tenant).forEach(period=>{
+    if(period.due.getFullYear()===year) expectedByMonth[period.due.getMonth()]+=period.amount;
+  }));
+  const annualExpected=expectedByMonth.reduce((sum,amount)=>sum+amount,0);
   const rate=annualExpected>0?Math.round(totInc/annualExpected*100):0;
 
   document.getElementById('rep-stats').innerHTML=`
@@ -1600,9 +1790,9 @@ function renderReports() {
 
   const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const rows=MO.map((m,i)=>{
-    const mI=pays.filter(p=>new Date(p.datePaid).getMonth()===i).reduce((s,p)=>s+Number(p.amount),0);
-    const mE=exps.filter(e=>new Date(e.date).getMonth()===i).reduce((s,e)=>s+Number(e.amount),0);
-    const mEx=moRent; const mN=mI-mE; const mR=mEx>0?Math.round(mI/mEx*100):0;
+    const mI=pays.filter(p=>dateValue(p.datePaid).getMonth()===i).reduce((s,p)=>s+Number(p.amount),0);
+    const mE=exps.filter(e=>dateValue(e.date).getMonth()===i).reduce((s,e)=>s+Number(e.amount),0);
+    const mEx=expectedByMonth[i]; const mN=mI-mE; const mR=mEx>0?Math.round(mI/mEx*100):0;
     return { m, mI, mE, mEx, mN, mR };
   });
 
@@ -1646,7 +1836,7 @@ function renderReports() {
     const W2=c2.width, H2=c2.height, pd2={t:20,r:20,b:60,l:50};
     const cW2=W2-pd2.l-pd2.r, cH2=H2-pd2.t-pd2.b;
     ctx2.clearRect(0,0,W2,H2);
-    const pData=props.map(p=>{ const pT=tens.filter(t=>t.propertyId===p.id); const pP=pays.filter(pay=>pT.some(t=>t.id===pay.tenantId)); const exp=pT.reduce((s,t)=>s+annualRent(t),0); const col=pP.reduce((s,p)=>s+Number(p.amount),0); return { name:p.name.slice(0,10), pct:exp>0?Math.min(100,Math.round(col/exp*100)):0 } });
+    const pData=props.map(p=>{ const pT=tens.filter(t=>t.propertyId===p.id); const pP=pays.filter(pay=>pT.some(t=>t.id===pay.tenantId)); const exp=pT.reduce((sum,t)=>sum+rentPeriods(t).filter(period=>period.due.getFullYear()===year).reduce((periodSum,period)=>periodSum+period.amount,0),0); const col=pP.reduce((s,p)=>s+Number(p.amount),0); return { name:p.name.slice(0,10), pct:exp>0?Math.min(100,Math.round(col/exp*100)):0 } });
     if(pData.length){
       const bw2=Math.min(60,(cW2/pData.length)*0.6);
       pData.forEach((p,i)=>{
@@ -2108,6 +2298,111 @@ function delNote(id) {
   save(K.notes, load(K.notes).filter(n=>n.id!==id)); renderNotes(); toast('Note deleted','warn');
 }
 
+let _agreementTenantId='';
+const _signedPads=new Set();
+function agreementTextFor(tenant) {
+  const settings=loadO(K.sets), property=load(K.props).find(item=>item.id===tenant.propertyId);
+  const period=rentPeriods(tenant);
+  const total=period.reduce((sum,item)=>sum+item.amount,0);
+  return `${settings.businessName||'Landlord'} and ${tenant.name} agree to the following tenancy terms.\n\nPROPERTY\n${property?.name||'—'}${tenant.unit?` / ${tenant.unit}`:''}\n${property?.address||''}\n\nLEASE TERM\nStart: ${fmtD(tenant.leaseStart)}\nEnd: ${fmtD(tenant.leaseEnd)}\n\nRENT\nCurrent rent: ${cur()} ${fmt(tenant.rentAmount)} ${tenant.rentFrequency.toLowerCase()}\nScheduled lease value based on recorded rent changes: ${cur()} ${fmt(total)}\nSecurity deposit: ${cur()} ${fmt(tenant.deposit||0)}\n\nTENANT\n${tenant.name}\nPhone: ${tenant.phone||'—'}\nEmail: ${tenant.email||'—'}\n\nSPECIAL CONDITIONS\n${tenant.notes||'None recorded.'}\n\nThe parties confirm that they have read and accepted these terms. Each party should retain a copy of the signed agreement.\n\nLandlord: ${settings.businessName||'________________________'}\nTenant: ${tenant.name}\nDate signed: ${fmtD(today())}`;
+}
+
+function fillDocumentTenantSelects() {
+  const tenants=load(K.tens);
+  ['agreement-tenant','document-tenant'].forEach(id=>{
+    const select=document.getElementById(id), prior=select.value;
+    select.innerHTML='<option value="">Select tenant…</option>'+tenants.map(tenant=>`<option value="${escapeHtml(tenant.id)}">${escapeHtml(tenant.name)} — ${escapeHtml(propName(tenant.propertyId))}</option>`).join('');
+    if(tenants.some(tenant=>tenant.id===prior)) select.value=prior;
+  });
+}
+
+function drawSignature(canvas,event) {
+  const rect=canvas.getBoundingClientRect();
+  const ctx=canvas.getContext('2d'), x=event.clientX-rect.left, y=event.clientY-rect.top;
+  if(event.type==='pointerdown') {
+    canvas.setPointerCapture(event.pointerId);ctx.beginPath();ctx.moveTo(x,y);_signedPads.add(canvas.id);
+  } else {ctx.lineTo(x,y);ctx.stroke()}
+}
+function setupSignaturePad(id) {
+  const canvas=document.getElementById(id), rect=canvas.getBoundingClientRect(), ratio=window.devicePixelRatio||1;
+  canvas.width=Math.max(1,Math.round(rect.width*ratio));canvas.height=Math.max(1,Math.round(rect.height*ratio));
+  const ctx=canvas.getContext('2d');ctx.setTransform(ratio,0,0,ratio,0,0);ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#1a2744';
+  canvas.onpointerdown=event=>{event.preventDefault();drawSignature(canvas,event)};
+  canvas.onpointermove=event=>{if(canvas.hasPointerCapture(event.pointerId)){event.preventDefault();drawSignature(canvas,event)}};
+  canvas.onpointerup=event=>{if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId)};
+}
+function clearSignature(id) {
+  const canvas=document.getElementById(id);canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);_signedPads.delete(id);
+}
+function openAgreementSigner() {
+  const tenantId=document.getElementById('agreement-tenant').value;
+  const tenant=load(K.tens).find(item=>item.id===tenantId);
+  if(!tenant){toast('Select a tenant first','err');return}
+  _agreementTenantId=tenantId;_signedPads.clear();
+  document.getElementById('agreement-text').value=agreementTextFor(tenant);
+  openMod('m-agreement');
+  requestAnimationFrame(()=>{setupSignaturePad('signature-landlord');setupSignaturePad('signature-tenant')});
+}
+async function saveSignedAgreement() {
+  if(!_signedPads.has('signature-landlord')||!_signedPads.has('signature-tenant')){toast('Both landlord and tenant signatures are required','err');return}
+  const tenant=load(K.tens).find(item=>item.id===_agreementTenantId);
+  if(!tenant){toast('Tenant record was not found','err');return}
+  const text=document.getElementById('agreement-text').value.trim();
+  if(!text){toast('Agreement terms cannot be empty','err');return}
+  const landlord=document.getElementById('signature-landlord').toDataURL('image/png');
+  const tenantSignature=document.getElementById('signature-tenant').toDataURL('image/png');
+  const html=`<!doctype html><html lang="en"><meta charset="utf-8"><title>Signed lease agreement</title><style>body{font:16px/1.55 Arial,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#222}pre{white-space:pre-wrap;font:inherit}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:36px}.signatures img{display:block;width:100%;height:120px;object-fit:contain;border-bottom:1px solid #555}</style><h1>Lease Agreement</h1><pre>${escapeHtml(text)}</pre><div class="signatures"><div><img src="${landlord}" alt="Landlord signature"><strong>Landlord signature</strong></div><div><img src="${tenantSignature}" alt="Tenant signature"><strong>Tenant signature</strong></div></div></html>`;
+  const record={id:uid(),tenantId:tenant.id,name:`${tenant.name} - Signed Lease Agreement.html`,mimeType:'text/html',kind:'signed-agreement',createdAt:new Date().toISOString(),blob:new Blob([html],{type:'text/html'})};
+  try { await saveDocumentRecord(record) }
+  catch(error){console.error('Could not save signed agreement',error);toast('Could not save agreement to offline storage. Export a backup or free browser storage and try again.','err');return}
+  closeMod('m-agreement');renderNotes();toast('Signed agreement saved on this device','ok');
+}
+async function importTenantDocument(input) {
+  const file=input.files?.[0];if(!file)return;
+  const tenantId=document.getElementById('document-tenant').value;
+  if(!tenantId){toast('Select the tenant before importing a document','err');input.value='';return}
+  if(!(file.type==='application/pdf'||file.type.startsWith('image/'))){toast('Choose a PDF or image file','err');input.value='';return}
+  if(file.size>MAX_DOCUMENT_BYTES){toast('Document is larger than the 15 MB offline storage limit','err');input.value='';return}
+  const tenant=load(K.tens).find(item=>item.id===tenantId);
+  try {
+    await saveDocumentRecord({id:uid(),tenantId,name:file.name,mimeType:file.type,kind:'imported-signed-document',createdAt:new Date().toISOString(),blob:file});
+    input.value='';renderNotes();toast(`Saved signed document for ${tenant?.name||'tenant'} on this device`,'ok');
+  } catch(error){console.error('Could not import signed document',error);toast('Could not save this file offline. Check browser storage and try again.','err')}
+}
+async function downloadStoredDocument(id) {
+  try {
+    const record=(await allDocumentRecords()).find(item=>item.id===id);
+    if(!record)throw new Error('Document was not found in offline storage');
+    const url=URL.createObjectURL(record.blob),link=document.createElement('a');link.href=url;link.download=record.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  } catch(error){console.error('Could not download document',error);toast('Could not access the saved document','err')}
+}
+async function shareStoredDocument(id) {
+  try {
+    const record=(await allDocumentRecords()).find(item=>item.id===id);
+    if(!record)throw new Error('Document was not found in offline storage');
+    const file=new File([record.blob],record.name,{type:record.mimeType||record.blob.type});
+    if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))) {
+      try {await navigator.share({title:record.name,files:[file]})}
+      catch(error){if(error.name!=='AbortError')throw error}
+    } else {await downloadStoredDocument(id);toast('Document downloaded; share it from your device','ok')}
+  } catch(error){console.error('Could not share document',error);toast('Could not share this document','err')}
+}
+async function deleteStoredDocument(id) {
+  if(!confirm('Delete this saved document from this device?'))return;
+  try {await deleteDocumentRecord(id);renderNotes();toast('Document deleted','warn')}
+  catch(error){console.error('Could not delete document',error);toast('Could not delete the saved document','err')}
+}
+async function refreshAgreementsList() {
+  const container=document.getElementById('agreements-list');
+  try {
+    const documents=await allDocumentRecords(),tenants=load(K.tens);
+    container.innerHTML=documents.length?`<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Document</th><th>Saved</th><th>Actions</th></tr></thead><tbody>${documents.map(record=>{
+      const tenant=tenants.find(item=>item.id===record.tenantId);
+      return `<tr><td>${escapeHtml(tenant?.name||'Tenant removed')}</td><td>${escapeHtml(record.name)}</td><td>${escapeHtml(fmtD(record.createdAt))}</td><td><div class="row"><button class="btn btn-ghost btn-sm" onclick="downloadStoredDocument(${inlineArg(record.id)})">Download</button><button class="btn btn-ghost btn-sm" onclick="shareStoredDocument(${inlineArg(record.id)})">Share</button><button class="btn btn-red btn-sm" onclick="deleteStoredDocument(${inlineArg(record.id)})">Delete</button></div></td></tr>`;
+    }).join('')}</tbody></table></div>`:'<p class="fs12 c-muted">No signed agreements or imported files saved on this device yet.</p>';
+  } catch(error){console.error('Could not load offline documents',error);container.textContent='Offline document storage is unavailable in this browser.'}
+}
+
 function renderNotes() {
   const notes=[...load(K.notes)].sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
   const legalBtns=LEGAL_DOCS.map((d,i)=>`<button class="btn btn-ghost btn-sm" style="justify-content:flex-start;text-align:left" onclick="useLegal(${i})">${d.icon} ${escapeHtml(d.title)}</button>`).join('');
@@ -2144,6 +2439,8 @@ function renderNotes() {
     </div>
     ${notes.length?`<div class="fs12 fw7 c-muted" style="text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px">Saved Documents (${notes.length})</div>`:''}
     ${savedHTML}`;
+  fillDocumentTenantSelects();
+  refreshAgreementsList();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2170,19 +2467,24 @@ function toggleDark(el) {
 // ═══════════════════════════════════════════════════════════
 // BACKUP
 // ═══════════════════════════════════════════════════════════
-function exportBackup() {
+async function exportBackup() {
   const data={};
   try {
     Object.entries(K).forEach(([k,v])=>{ data[k]=JSON.parse(localStorage.getItem(v)||(k==='sets'?'{}':'[]')) });
     if(!isValidBackup(data)) throw new Error('Stored data does not match the backup format');
+    data.documents=await Promise.all((await allDocumentRecords()).map(async record=>({
+      id:record.id,tenantId:record.tenantId,name:record.name,mimeType:record.mimeType,
+      kind:record.kind,createdAt:record.createdAt,dataUrl:await readFileAsDataUrl(record.blob)
+    })));
   } catch(error) {
     console.error('Backup export failed',error);
-    toast('Could not export backup because stored data is unreadable or invalid','err');
+    toast('Could not export backup. Check stored data and offline document storage.','err');
     return;
   }
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download=`propmanager-backup-${today()}.json`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   toast('Backup exported','ok');
 }
 
@@ -2207,6 +2509,11 @@ function isValidBackup(data) {
       if(schema.numbers?.some(field=>typeof record[field]!=='number' || !Number.isFinite(record[field]) || record[field]<=0)) return false;
       if(schema.dates?.some(field=>!parseLocalDate(record[field]))) return false;
       if(key==='tens' && record.leaseEnd && !parseLocalDate(record.leaseEnd)) return false;
+      if(key==='tens' && record.rentHistory!==undefined && (!Array.isArray(record.rentHistory)||record.rentHistory.some(rate=>
+        !rate||typeof rate!=='object'||!parseLocalDate(rate.effectiveDate)||typeof rate.rentFrequency!=='string'||
+        !['Monthly','Quarterly','Annually'].includes(rate.rentFrequency)||!Number.isFinite(Number(rate.rentAmount))||Number(rate.rentAmount)<=0
+      ))) return false;
+      if(key==='pays' && record.allocationPeriod!==undefined && record.allocationPeriod!=='' && !parseLocalDate(record.allocationPeriod)) return false;
     }
   }
   if(Object.prototype.hasOwnProperty.call(data,'sets')) {
@@ -2215,22 +2522,34 @@ function isValidBackup(data) {
     if(['businessName','currency','phone'].some(field=>sets[field]!==undefined && typeof sets[field]!=='string')) return false;
     if(sets.dark!==undefined && typeof sets.dark!=='boolean') return false;
   }
+  if(Object.prototype.hasOwnProperty.call(data,'documents')) {
+    if(!Array.isArray(data.documents))return false;
+    for(const documentRecord of data.documents) {
+      if(!documentRecord||typeof documentRecord!=='object'||Array.isArray(documentRecord))return false;
+      if(['id','tenantId','name','mimeType','kind','createdAt','dataUrl'].some(field=>typeof documentRecord[field]!=='string'||!documentRecord[field].trim()))return false;
+      if(!/^data:(application\/pdf|image\/[a-z0-9.+-]+|text\/html);base64,/i.test(documentRecord.dataUrl))return false;
+      if(documentRecord.dataUrl.length>Math.ceil(MAX_DOCUMENT_BYTES*4/3)+1024)return false;
+    }
+  }
   return true;
 }
 
 function importBackup(input) {
   const file=input.files[0]; if(!file) return;
   const r=new FileReader();
-  r.onload=e=>{
+  r.onload=async e=>{
     let data;
     try { data=JSON.parse(e.target.result) }
     catch { toast('Backup file is not valid JSON','err'); return }
     if(!isValidBackup(data)){ toast('Backup data has an invalid structure','err'); return }
-    if(!confirm('This will replace ALL current data. Are you sure?')) return;
+    if(!confirm('This will replace all current records'+(Array.isArray(data.documents)?' and saved documents':'')+'. Continue?')) return;
 
     const keys=[...Object.values(K),'pm_demo_ok'];
     const previous=new Map(keys.map(key=>[key,localStorage.getItem(key)]));
     const previousErrors=new Set(storageErrors);
+    let previousDocuments=[];
+    try { if(Array.isArray(data.documents)) previousDocuments=await allDocumentRecords() }
+    catch(error){console.error('Could not preserve current documents before restore',error);toast('Restore stopped because current documents could not be protected','err');return}
     storageErrors.clear();
     try {
       for(const [key,storageKey] of Object.entries(K)) {
@@ -2238,6 +2557,13 @@ function importBackup(input) {
         else localStorage.removeItem(storageKey);
       }
       localStorage.removeItem('pm_demo_ok');
+      if(Array.isArray(data.documents)) {
+        const documents=data.documents.map(record=>({
+          id:record.id,tenantId:record.tenantId,name:record.name,mimeType:record.mimeType,
+          kind:record.kind,createdAt:record.createdAt,blob:dataUrlToBlob(record.dataUrl)
+        }));
+        await replaceDocumentRecords(documents);
+      }
     } catch(error) {
       const rollbackErrors=[];
       for(const [key,value] of previous) {
@@ -2248,11 +2574,15 @@ function importBackup(input) {
       }
       storageErrors.clear();
       previousErrors.forEach(key=>storageErrors.add(key));
+      if(Array.isArray(data.documents)) {
+        try { await replaceDocumentRecords(previousDocuments) }
+        catch(rollbackError){rollbackErrors.push(rollbackError)}
+      }
       console.error('Backup restore failed',error);
       toast(rollbackErrors.length?'Restore failed; some previous data could not be recovered':'Restore failed; previous data was restored','err');
       return;
     }
-    toast('Backup restored successfully','ok');
+    toast(Array.isArray(data.documents)?'Backup and saved documents restored successfully':'Backup restored; existing saved documents were kept','ok');
     renderDash();
     const activeSection=document.querySelector('.section.active')?.id.replace('section-','');
     if(activeSection && activeSection!=='dashboard' && renders[activeSection]) renders[activeSection]();
@@ -2283,15 +2613,22 @@ function exportCSV() {
   toast('CSV exported','ok');
 }
 
-function clearDemo() {
+async function clearDemo() {
   if(!confirm('Remove demo data?')) return;
+  const demoTenantIds=new Set(load(K.tens).filter(tenant=>tenant._demo).map(tenant=>tenant.id));
+  try {
+    const documents=await allDocumentRecords();
+    await replaceDocumentRecords(documents.filter(record=>!demoTenantIds.has(record.tenantId)));
+  } catch(error){console.error('Could not remove demo documents',error);toast('Demo data was not removed because saved documents could not be updated','err');return}
   Object.entries(K).filter(([key])=>key!=='sets').forEach(([,v])=>{ const arr=load(v); save(v,arr.filter(x=>!x._demo)) });
-  toast('Demo data removed','warn'); renderDash();
+  toast('Demo data removed','warn'); renderDash();renderNotes();
 }
 
-function clearAll() {
+async function clearAll() {
   if(!confirm('DELETE ALL DATA? This cannot be undone!')) return;
   if(!confirm('Final confirmation — all records will be permanently lost.')) return;
+  try { await replaceDocumentRecords([]) }
+  catch(error){console.error('Could not clear offline documents',error);toast('Data was not cleared because saved documents could not be removed','err');return}
   Object.values(K).forEach(v=>localStorage.removeItem(v));
   storageErrors.clear();
   localStorage.removeItem('pm_demo_ok'); toast('All data cleared','warn'); renderDash();
@@ -2322,7 +2659,7 @@ function loadDemo() {
     // Update payment dates
     const pays = load(K.pays);
     if (pays.length) {
-      const sorted = [...pays].filter(p=>p._demo).sort((a,b)=>new Date(a.datePaid)-new Date(b.datePaid));
+      const sorted = [...pays].filter(p=>p._demo).sort((a,b)=>String(a.datePaid).localeCompare(String(b.datePaid)));
       const intervals = sorted.map((_,i)=>i);
       sorted.forEach((p,i) => { p.datePaid = ago(sorted.length-1-i) });
       save(K.pays, [...pays.filter(p=>!p._demo), ...sorted]);
