@@ -79,6 +79,12 @@ Open that URL in Chrome on your phone or computer.
 - Photos and wallpaper are compressed and stored offline in this browser. Backup/restore includes them with saved documents, so use a fresh backup to transfer them to another device.
 - Images and records remain device/browser-specific until you export and restore a backup. Clearing browser storage removes the local copies.
 
+## Destructive Action Protection
+- Optionally set a 4–6 digit PIN or a password of at least 8 characters in **Settings**. It is requested before **Restore Backup** or **Clear All**; everyday app use and backup export remain available without it.
+- Save the one-time recovery code somewhere separate from the device. If you forget the PIN/password, choose **Forgot PIN/password?**, enter the recovery code, and set a replacement credential and recovery code.
+- The safeguard is stored only in this browser and is not included in backups, so restoring a backup does not replace it. Clearing all records also leaves the safeguard enabled until you turn it off in Settings.
+- This is an offline accidental-action deterrent, not encryption or tamper-proof security. Someone with direct access to browser storage can bypass it. Browser/site-data deletion removes both app data and the safeguard.
+
 ## Rent Schedules and Reminders
 - Rent schedules list each lease period, amount paid, and remaining balance.
 - Payments can be allocated to a selected period or automatically applied oldest-first.

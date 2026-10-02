@@ -507,6 +507,15 @@ body.dark .ps-item{background:var(--bg)}
       </div>
     </div>
     <div class="card">
+      <div class="card-title">Destructive Action Protection</div>
+      <p id="safety-status" class="fs13 c-muted" style="margin-bottom:14px">Checking protection status…</p>
+      <div class="row">
+        <button id="safety-configure" class="btn btn-ghost btn-sm" onclick="manageSafety('change')">Set PIN or password</button>
+        <button id="safety-disable" class="btn btn-ghost btn-sm" onclick="manageSafety('disable')" style="display:none">Turn off protection</button>
+      </div>
+      <small class="c-muted" style="display:block;margin-top:10px">When enabled, this device asks for your PIN/password before restoring a backup or clearing all data. A recovery code is shown during setup. This offline safeguard helps prevent accidents; it is not encryption and can be bypassed by someone with direct access to browser storage.</small>
+    </div>
+    <div class="card">
       <div class="card-title">Danger Zone</div>
       <div class="row">
         <button class="btn btn-ghost btn-sm" onclick="clearDemo()">🗑 Remove Demo Data</button>
@@ -722,6 +731,34 @@ body.dark .ps-item{background:var(--bg)}
   </div>
 </div>
 
+<div class="modal-bg" id="m-safety">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-hd"><h3 id="safety-title">Destructive Action Protection</h3><button class="modal-close" onclick="cancelSafetyFlow()">✕</button></div>
+    <form class="modal-body" onsubmit="event.preventDefault();submitSafetyFlow()">
+      <p id="safety-message" class="fs13 c-muted" style="margin-bottom:14px"></p>
+      <div id="safety-credential-fields">
+        <div id="safety-type-wrap" class="fg"><label for="safety-type">Credential type</label><select id="safety-type" onchange="updateSafetyCredentialField()"><option value="pin">PIN (4–6 digits)</option><option value="password">Password (8+ characters)</option></select></div>
+        <div id="safety-entry-fields">
+          <div class="fg"><label id="safety-credential-label" for="safety-credential">PIN</label><input id="safety-credential" type="password" autocomplete="current-password" required></div>
+          <div id="safety-confirm-wrap" class="fg"><label for="safety-confirm">Confirm PIN/password</label><input id="safety-confirm" type="password" autocomplete="new-password"></div>
+        </div>
+      </div>
+      <div id="safety-recovery-wrap" class="fg" style="display:none"><label for="safety-recovery">Recovery code</label><input id="safety-recovery" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+      <div id="safety-code-card" class="card" style="display:none;margin:12px 0;padding:14px">
+        <strong>Save this recovery code now</strong>
+        <p id="safety-code" style="font:700 18px monospace;letter-spacing:1px;margin:8px 0;overflow-wrap:anywhere"></p>
+        <p class="fs12 c-muted">It is shown only once. You must enter it below to finish. Keep it somewhere separate from this device.</p>
+        <div class="fg"><label for="safety-code-confirm">Re-enter recovery code</label><input id="safety-code-confirm" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+      </div>
+      <div class="form-actions">
+        <button id="safety-recover-button" type="button" class="btn btn-ghost" onclick="beginSafetyRecovery()" style="display:none">Forgot PIN/password?</button>
+        <button type="button" class="btn btn-ghost" onclick="cancelSafetyFlow()">Cancel</button>
+        <button id="safety-submit" type="submit" class="btn btn-gold">Continue</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════════════
 // DATA LAYER
@@ -873,7 +910,11 @@ document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', 
 // ═══════════════════════════════════════════════════════════
 const openMod = id => document.getElementById(id).classList.add('open');
 const closeMod = id => document.getElementById(id).classList.remove('open');
-document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open') }));
+document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => {
+  if(e.target!==m)return;
+  if(m.id==='m-safety')cancelSafetyFlow();
+  else m.classList.remove('open');
+}));
 
 // ═══════════════════════════════════════════════════════════
 // TOAST
@@ -2589,6 +2630,7 @@ async function loadSettings() {
     preview.src=url;preview.style.display=url?'block':'none';
     sidebar.src=url;sidebar.style.display=url?'block':'none';
   } catch(error){console.error('Could not load owner photo',error);toast('Could not load the owner profile photo','err')}
+  refreshSafetyStatus();
 }
 
 async function saveSettings() {
@@ -2677,6 +2719,225 @@ async function removeOwnerPhoto() {
   } catch(error){console.error('Could not remove owner photo',error);toast('Could not remove the owner photo','err')}
 }
 
+const SAFETY_KEY='pm_destructive_guard_v1';
+const SAFETY_ITERATIONS=210000;
+let safetyFlow=null;
+function randomHex(bytes=16) {
+  const value=crypto.getRandomValues(new Uint8Array(bytes));
+  return Array.from(value,byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+function makeRecoveryCode() {
+  const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes=crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes,byte=>alphabet[byte&31]).join('').match(/.{1,4}/g).join('-');
+}
+function normalizedRecoveryCode(value) {
+  return String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+function isHex(value,length) {
+  return typeof value==='string'&&new RegExp(`^[a-f0-9]{${length}}$`,'i').test(value);
+}
+function readSafetyConfig() {
+  const raw=localStorage.getItem(SAFETY_KEY);
+  if(raw===null)return null;
+  let config;
+  try {config=JSON.parse(raw)}
+  catch(error){throw new Error('Protection settings are unreadable; destructive actions are blocked')}
+  if(!config||config.version!==1||!['pin','password'].includes(config.credentialType)||
+    !Number.isInteger(config.iterations)||config.iterations<100000||config.iterations>500000||
+    !isHex(config.salt,32)||!isHex(config.verifier,64)||!isHex(config.recoverySalt,32)||!isHex(config.recoveryVerifier,64)) {
+    throw new Error('Protection settings are invalid; destructive actions are blocked');
+  }
+  return config;
+}
+async function hashSafetySecret(secret,salt,iterations=SAFETY_ITERATIONS) {
+  if(!crypto?.subtle)throw new Error('Secure credential storage is unavailable in this browser. Use the app over HTTPS to enable protection.');
+  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),'PBKDF2',false,['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:Uint8Array.from(salt.match(/.{2}/g),byte=>parseInt(byte,16)),iterations},key,256);
+  return Array.from(new Uint8Array(bits),byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+function equalSafetySecrets(left,right) {
+  if(typeof left!=='string'||typeof right!=='string'||left.length!==right.length)return false;
+  let difference=0;
+  for(let i=0;i<left.length;i++)difference|=left.charCodeAt(i)^right.charCodeAt(i);
+  return difference===0;
+}
+function refreshSafetyStatus() {
+  const status=document.getElementById('safety-status');
+  if(!status)return;
+  const configure=document.getElementById('safety-configure'),disable=document.getElementById('safety-disable');
+  try {
+    const config=readSafetyConfig();
+    status.textContent=config?'Protection is enabled for backup restore and Clear All on this device.':'Protection is off. Set a PIN or password to guard backup restore and Clear All.';
+    configure.textContent=config?'Change PIN/password':'Set PIN or password';
+    disable.style.display=config?'':'none';
+    configure.disabled=false;
+  } catch(error) {
+    status.textContent=error.message;
+    configure.textContent='Protection unavailable';
+    configure.disabled=true;disable.style.display='none';
+  }
+}
+function setSafetyStage(stage,message) {
+  if(!safetyFlow)return;
+  safetyFlow.stage=stage;
+  const config=readSafetyConfig();
+  const setup=stage==='configure'||stage==='confirm-code';
+  const recovery=stage==='recovery';
+  const confirmCode=stage==='confirm-code';
+  const credentialFields=document.getElementById('safety-credential-fields');
+  const entryFields=document.getElementById('safety-entry-fields');
+  const typeWrap=document.getElementById('safety-type-wrap');
+  const confirmWrap=document.getElementById('safety-confirm-wrap');
+  const recoveryWrap=document.getElementById('safety-recovery-wrap');
+  const codeCard=document.getElementById('safety-code-card');
+  const recoverButton=document.getElementById('safety-recover-button');
+  credentialFields.style.display=setup||!recovery?'':'none';
+  entryFields.style.display=setup&&!confirmCode||stage==='authenticate'?'':'none';
+  typeWrap.style.display=setup&&!confirmCode?'':'none';
+  confirmWrap.style.display=setup&&!confirmCode?'':'none';
+  recoveryWrap.style.display=recovery?'':'none';
+  codeCard.style.display=confirmCode?'':'none';
+  recoverButton.style.display=stage==='authenticate'?'':'none';
+  document.getElementById('safety-title').textContent=stage==='authenticate'
+    ?(safetyFlow.target==='action'?'Confirm it’s you':safetyFlow.target==='disable'?'Turn off protection':'Change PIN/password')
+    :recovery?'Recover protection':confirmCode?'Save your recovery code':'Set PIN or password';
+  document.getElementById('safety-message').textContent=message||(
+    stage==='authenticate'?'Enter your current PIN/password to continue.':
+    recovery?'Enter your recovery code to set a new PIN/password.':
+    confirmCode?'Re-enter the recovery code exactly as shown to finish setup.':
+    'Choose a PIN or password. You will need it before restoring a backup or clearing all data.'
+  );
+  const submit=document.getElementById('safety-submit');
+  submit.textContent=stage==='authenticate'?'Continue':recovery?'Verify recovery code':confirmCode?'Save protection':'Generate recovery code';
+  const credential=document.getElementById('safety-credential'),confirm=document.getElementById('safety-confirm');
+  const recoveryInput=document.getElementById('safety-recovery'),codeConfirm=document.getElementById('safety-code-confirm');
+  credential.required=setup&&!confirmCode||stage==='authenticate';
+  confirm.required=setup&&!confirmCode;
+  recoveryInput.required=recovery;
+  codeConfirm.required=confirmCode;
+  credential.value='';confirm.value='';recoveryInput.value='';codeConfirm.value='';
+  if(stage==='authenticate'&&config) {
+    document.getElementById('safety-credential-label').textContent=config.credentialType==='pin'?'PIN':'Password';
+    credential.inputMode=config.credentialType==='pin'?'numeric':'text';
+    credential.maxLength=config.credentialType==='pin'?6:128;
+    credential.autocomplete='current-password';
+  } else {
+    updateSafetyCredentialField();
+  }
+  openMod('m-safety');
+  setTimeout(()=>document.getElementById(recovery?'safety-recovery':'safety-credential').focus(),0);
+}
+function updateSafetyCredentialField() {
+  const type=document.getElementById('safety-type').value;
+  const credential=document.getElementById('safety-credential');
+  document.getElementById('safety-credential-label').textContent=type==='pin'?'PIN (4–6 digits)':'Password (8+ characters)';
+  credential.inputMode=type==='pin'?'numeric':'text';
+  credential.maxLength=type==='pin'?6:128;
+  credential.autocomplete='new-password';
+}
+function beginSafetySetup(target) {
+  safetyFlow={target,stage:'configure',recoveryCode:''};
+  setSafetyStage('configure');
+}
+function manageSafety(target) {
+  try {
+    const config=readSafetyConfig();
+    if(target==='disable'&&!config){toast('Destructive-action protection is already off','info');return}
+    if(!config){beginSafetySetup('change');return}
+    safetyFlow={target,stage:'authenticate',recoveryCode:''};
+    setSafetyStage('authenticate');
+  } catch(error){console.error('Could not read protection settings',error);toast(error.message,'err')}
+}
+function authorizeDestructiveAction(action) {
+  let config;
+  try {config=readSafetyConfig()}
+  catch(error){console.error('Could not verify protection settings',error);toast(error.message,'err');return Promise.resolve(false)}
+  if(!config)return Promise.resolve(true);
+  return new Promise(resolve=>{
+    safetyFlow={target:'action',action,resolve,stage:'authenticate',recoveryCode:''};
+    setSafetyStage('authenticate',`Enter your PIN/password to ${action}.`);
+  });
+}
+function cancelSafetyFlow() {
+  if(!safetyFlow)return;
+  const flow=safetyFlow;safetyFlow=null;
+  closeMod('m-safety');
+  document.getElementById('safety-code').textContent='';
+  if(flow.resolve)flow.resolve(false);
+}
+function beginSafetyRecovery() {
+  if(!safetyFlow)return;
+  setSafetyStage('recovery','Enter the recovery code you saved during setup. You will create a new PIN/password afterward.');
+}
+function validateSafetyCredential(type,value) {
+  return type==='pin'?/^\d{4,6}$/.test(value):value.length>=8&&value.length<=128;
+}
+async function submitSafetyFlow() {
+  if(!safetyFlow)return;
+  try {
+    const flow=safetyFlow,stage=flow.stage;
+    if(stage==='authenticate') {
+      const config=readSafetyConfig();
+      if(!config){toast('Protection is no longer enabled','err');cancelSafetyFlow();return}
+      const value=document.getElementById('safety-credential').value;
+      const actual=await hashSafetySecret(value,config.salt,config.iterations);
+      if(!equalSafetySecrets(actual,config.verifier)){toast('Incorrect PIN/password','err');return}
+      if(flow.target==='action'){finishSafetyFlow(true);return}
+      if(flow.target==='disable'){localStorage.removeItem(SAFETY_KEY);finishSafetyFlow();refreshSafetyStatus();toast('Destructive-action protection turned off','warn');return}
+      setSafetyStage('configure');
+      return;
+    }
+    if(stage==='recovery') {
+      const config=readSafetyConfig();
+      const recovery=normalizedRecoveryCode(document.getElementById('safety-recovery').value);
+      const actual=await hashSafetySecret(recovery,config.recoverySalt,config.iterations);
+      if(!equalSafetySecrets(actual,config.recoveryVerifier)){toast('Recovery code did not match','err');return}
+      if(flow.target==='disable'){localStorage.removeItem(SAFETY_KEY);finishSafetyFlow();refreshSafetyStatus();toast('Protection turned off using the recovery code','warn');return}
+      flow.recovered=true;
+      setSafetyStage('configure','Recovery accepted. Choose a new PIN/password; a replacement recovery code will be generated.');
+      return;
+    }
+    if(stage==='configure') {
+      const type=document.getElementById('safety-type').value;
+      const value=document.getElementById('safety-credential').value;
+      const confirmation=document.getElementById('safety-confirm').value;
+      if(!validateSafetyCredential(type,value)){toast(type==='pin'?'PIN must contain 4–6 digits':'Password must contain at least 8 characters','err');return}
+      if(value!==confirmation){toast('PIN/password entries do not match','err');return}
+      const recoveryCode=makeRecoveryCode(),salt=randomHex(),recoverySalt=randomHex();
+      const [verifier,recoveryVerifier]=await Promise.all([
+        hashSafetySecret(value,salt),
+        hashSafetySecret(normalizedRecoveryCode(recoveryCode),recoverySalt)
+      ]);
+      flow.pendingConfig={version:1,credentialType:type,iterations:SAFETY_ITERATIONS,salt,verifier,recoverySalt,recoveryVerifier};
+      flow.recoveryCode=recoveryCode;
+      document.getElementById('safety-code').textContent=recoveryCode;
+      setSafetyStage('confirm-code');
+      return;
+    }
+    if(stage==='confirm-code') {
+      const entered=normalizedRecoveryCode(document.getElementById('safety-code-confirm').value);
+      if(!equalSafetySecrets(entered,normalizedRecoveryCode(flow.recoveryCode))){toast('Recovery code did not match. Save and re-enter the code shown above.','err');return}
+      localStorage.setItem(SAFETY_KEY,JSON.stringify(flow.pendingConfig));
+      const action=flow.target==='action';
+      finishSafetyFlow(action);
+      refreshSafetyStatus();
+      toast(action?'Protection updated; continuing with the requested action':'Destructive-action protection is enabled','ok');
+    }
+  } catch(error){console.error('Could not update or verify destructive-action protection',error);toast(error.message||'Could not verify protection. No destructive action was performed.','err')}
+}
+function finishSafetyFlow(result) {
+  if(!safetyFlow)return;
+  const flow=safetyFlow;safetyFlow=null;
+  closeMod('m-safety');
+  document.getElementById('safety-code').textContent='';
+  document.getElementById('safety-credential').value='';
+  document.getElementById('safety-confirm').value='';
+  document.getElementById('safety-recovery').value='';
+  document.getElementById('safety-code-confirm').value='';
+  if(flow.resolve)flow.resolve(!!result);
+}
+
 // ═══════════════════════════════════════════════════════════
 // BACKUP
 // ═══════════════════════════════════════════════════════════
@@ -2758,6 +3019,7 @@ function importBackup(input) {
     catch { toast('Backup file is not valid JSON','err'); return }
     if(!isValidBackup(data)){ toast('Backup data has an invalid structure','err'); return }
     if(!confirm('This will replace all current records'+(Array.isArray(data.documents)?' and saved documents':'')+'. Continue?')) return;
+    if(!(await authorizeDestructiveAction('restore this backup'))){input.value='';return}
 
     const keys=[...Object.values(K),'pm_demo_ok'];
     const previous=new Map(keys.map(key=>[key,localStorage.getItem(key)]));
@@ -2851,12 +3113,15 @@ async function clearDemo() {
 async function clearAll() {
   if(!confirm('DELETE ALL DATA? This cannot be undone!')) return;
   if(!confirm('Final confirmation — all records will be permanently lost.')) return;
+  if(!(await authorizeDestructiveAction('clear all local data')))return;
   try { await replaceDocumentRecords([]) }
   catch(error){console.error('Could not clear offline documents',error);toast('Data was not cleared because saved documents could not be removed','err');return}
   objectUrls.forEach(url=>URL.revokeObjectURL(url));objectUrls.clear();
   Object.values(K).forEach(v=>localStorage.removeItem(v));
   storageErrors.clear();
-  localStorage.removeItem('pm_demo_ok'); toast('All data cleared','warn'); renderDash();
+  localStorage.removeItem('pm_demo_ok');
+  toast(localStorage.getItem(SAFETY_KEY)?'All data cleared; destructive-action protection remains enabled':'All data cleared','warn');
+  renderDash();
 }
 
 // ═══════════════════════════════════════════════════════════
