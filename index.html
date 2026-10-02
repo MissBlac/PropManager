@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PropManager — Landlord App</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="theme-color" content="#f0a500">
 <style>
 :root {
   --navy:#1a2744; --navy2:#243461; --gold:#f0a500; --gold2:#ffc93c;
@@ -358,7 +362,7 @@ body.dark .ps-item{background:var(--bg)}
   </div>
   <div class="search"><span>🔍</span><input type="text" id="ten-search" placeholder="Search by name, phone, property…" oninput="renderTenants()"></div>
   <div class="card"><div class="tbl-wrap"><table>
-    <thead><tr><th>Tenant</th><th>Property / Unit</th><th>Rent</th><th>Frequency</th><th>Lease End</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Tenant</th><th>Property / Unit</th><th>Rent</th><th>Frequency</th><th>Lease End</th><th>Lease Value</th><th>Lease Balance</th><th>Status</th><th></th></tr></thead>
     <tbody id="ten-body"></tbody>
   </table></div></div>
 </section>
@@ -371,7 +375,7 @@ body.dark .ps-item{background:var(--bg)}
   </div>
   <div class="search"><span>🔍</span><input type="text" id="rent-search" placeholder="Search tenants…" oninput="renderRent()"></div>
   <div class="card"><div class="tbl-wrap"><table>
-    <thead><tr><th>Tenant</th><th>Property</th><th>Rent Due</th><th>Lease Value</th><th>Last Paid</th><th>Balance</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Tenant</th><th>Property</th><th>Rent Due</th><th>Lease Value</th><th>Lease Balance</th><th>Last Paid</th><th>Rent Arrears</th><th>Status</th><th></th></tr></thead>
     <tbody id="rent-body"></tbody>
   </table></div></div>
 </section>
@@ -681,9 +685,51 @@ body.dark .ps-item{background:var(--bg)}
 // DATA LAYER
 // ═══════════════════════════════════════════════════════════
 const K = { props:'pm_props', tens:'pm_tens', pays:'pm_pays', exps:'pm_exps', maints:'pm_maints', notes:'pm_notes', sets:'pm_sets' };
-const load  = k => { try { return JSON.parse(localStorage.getItem(k)) || [] } catch { return [] } };
-const loadO = k => { try { return JSON.parse(localStorage.getItem(k)) || {} } catch { return {} } };
-const save  = (k,d) => localStorage.setItem(k, JSON.stringify(d));
+const storageErrors = new Set();
+const load = k => {
+  const raw=localStorage.getItem(k);
+  if(raw===null) return [];
+  try {
+    const data=JSON.parse(raw);
+    if(!Array.isArray(data)) throw new TypeError('Expected an array');
+    return data;
+  } catch(error) {
+    if(!storageErrors.has(k)) {
+      console.error(`Could not read stored data for ${k}`,error);
+      toast(`Stored data for ${k} is unreadable. Restore a backup before editing it.`,'err');
+      storageErrors.add(k);
+    }
+    return [];
+  }
+};
+const loadO = k => {
+  const raw=localStorage.getItem(k);
+  if(raw===null) return {};
+  try {
+    const data=JSON.parse(raw);
+    if(!data || typeof data!=='object' || Array.isArray(data)) throw new TypeError('Expected an object');
+    return data;
+  } catch(error) {
+    if(!storageErrors.has(k)) {
+      console.error(`Could not read stored data for ${k}`,error);
+      toast(`Stored settings are unreadable. Restore a backup before editing them.`,'err');
+      storageErrors.add(k);
+    }
+    return {};
+  }
+};
+const save = (k,d) => {
+  if(storageErrors.has(k)) {
+    toast(`Cannot overwrite unreadable stored data for ${k}. Restore a backup first.`,'err');
+    throw new Error(`Refusing to overwrite unreadable localStorage key: ${k}`);
+  }
+  try { localStorage.setItem(k, JSON.stringify(d)) }
+  catch(error) {
+    console.error(`Could not save stored data for ${k}`,error);
+    toast(`Could not save ${k}. Check available browser storage.`,'err');
+    throw error;
+  }
+};
 const uid   = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 
 // ═══════════════════════════════════════════════════════════
@@ -711,7 +757,7 @@ document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', 
 function toast(msg, type='info') {
   const cls = { ok:'t-ok', err:'t-err', warn:'t-warn', info:'t-info' };
   const ic  = { ok:'✓', err:'✗', warn:'⚠', info:'ℹ' };
-  const el  = Object.assign(document.createElement('div'), { className:'toast ' + (cls[type]||'t-info'), innerHTML: ic[type]+' '+msg });
+  const el  = Object.assign(document.createElement('div'), { className:'toast ' + (cls[type]||'t-info'), textContent: (ic[type]||ic.info)+' '+msg });
   document.getElementById('toasts').appendChild(el);
   setTimeout(() => el.remove(), 3400);
 }
@@ -722,19 +768,35 @@ function toast(msg, type='info') {
 const cur   = () => loadO(K.sets).currency || 'GHS';
 const fmt   = n => Number(n||0).toLocaleString('en-GH', {minimumFractionDigits:2, maximumFractionDigits:2});
 const fmtD  = d => d ? new Date(d).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) : '—';
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => {
+  const now=new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+};
 const days  = (d1, d2) => Math.round((new Date(d2) - new Date(d1)) / 86400000);
 const propName = id => (load(K.props).find(p => p.id === id) || {}).name || '—';
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[ch]));
+const inlineArg = value => escapeHtml(JSON.stringify(String(value ?? '')));
+const parseLocalDate = value => {
+  const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||''));
+  if(!match) return null;
+  const date=new Date(Number(match[1]),Number(match[2])-1,Number(match[3]));
+  return date.getFullYear()===Number(match[1]) && date.getMonth()===Number(match[2])-1 && date.getDate()===Number(match[3]) ? date : null;
+};
+const addMonthsClamped = (date, monthCount) => {
+  const result=new Date(date.getFullYear(),date.getMonth()+monthCount,1);
+  result.setDate(Math.min(date.getDate(),new Date(result.getFullYear(),result.getMonth()+1,0).getDate()));
+  return result;
+};
 
 function tenStatus(t) {
   const pays    = load(K.pays).filter(p => p.tenantId === t.id);
   const total   = pays.reduce((s,p) => s + Number(p.amount), 0);
-  const start   = new Date(t.leaseStart);
+  const start   = parseLocalDate(t.leaseStart);
   const now     = new Date();
 
   // Use the earlier of today or lease end — don't charge beyond the lease period
-  const endRef  = (t.leaseEnd && new Date(t.leaseEnd) < now) ? new Date(t.leaseEnd) : now;
+  const leaseEndDate=parseLocalDate(t.leaseEnd);
+  const endRef  = (leaseEndDate && leaseEndDate < new Date(now.getFullYear(),now.getMonth(),now.getDate())) ? leaseEndDate : now;
 
   const freqMo  = t.rentFrequency === 'Monthly' ? 1 : t.rentFrequency === 'Quarterly' ? 3 : 12;
 
@@ -742,15 +804,15 @@ function tenStatus(t) {
   const monthsElapsed = (endRef.getFullYear() - start.getFullYear()) * 12
                       + (endRef.getMonth() - start.getMonth());
   // Count current partial period as a full one (rent is due at start of each period)
-  const elapsed  = Math.max(1, Math.ceil(monthsElapsed / freqMo));
+  const elapsed  = now < start ? 0 : Math.max(1, Math.ceil(monthsElapsed / freqMo));
   const expected = Number(t.rentAmount) * elapsed;
   const balance  = expected - total;
 
   // Total lease value (full contract, regardless of today)
-  const leaseMonths = t.leaseEnd
-    ? Math.round((new Date(t.leaseEnd) - start) / (1000*60*60*24*30.4375))
+  const leaseMonths = start && leaseEndDate
+    ? Math.round((Date.UTC(leaseEndDate.getFullYear(),leaseEndDate.getMonth(),leaseEndDate.getDate())-Date.UTC(start.getFullYear(),start.getMonth(),start.getDate()))/(86400000*30.4375))
     : null;
-  const leaseTotal  = leaseMonths ? Number(t.rentAmount) * Math.ceil(leaseMonths / freqMo) : null;
+  const leaseTotal  = leaseMonths !== null && leaseMonths >= 0 ? Number(t.rentAmount) * Math.max(1,Math.ceil(leaseMonths / freqMo)) : null;
 
   const lastPay  = [...pays].sort((a,b) => new Date(b.datePaid)-new Date(a.datePaid))[0];
   return { total, expected, balance, pays, lastPay, leaseTotal, leaseMonths };
@@ -758,28 +820,33 @@ function tenStatus(t) {
 
 function dueSoon(t) {
   if (!t.leaseStart) return false;
-  // If lease has ended don't show as due soon
-  if (t.leaseEnd && new Date(t.leaseEnd) < new Date()) return false;
+  const leaseEnd=parseLocalDate(t.leaseEnd);
+  const todayStart=new Date(); todayStart.setHours(0,0,0,0);
+  if (leaseEnd && leaseEnd < todayStart) return false;
 
-  const start = new Date(t.leaseStart);
-  const now   = new Date();
+  const start = parseLocalDate(t.leaseStart);
+  if(!start) return false;
 
-  // Calculate next due date using real calendar months, not 30-day approximation
-  const monthsElapsed = (now.getFullYear() - start.getFullYear()) * 12
-                      + (now.getMonth() - start.getMonth());
   const freqMo = t.rentFrequency === 'Monthly' ? 1
                : t.rentFrequency === 'Quarterly' ? 3 : 12;
-
-  const cyclesDone = Math.floor(monthsElapsed / freqMo);
-  const nextDue    = new Date(start);
-  nextDue.setMonth(start.getMonth() + (cyclesDone + 1) * freqMo);
-
-  const daysUntil = Math.round((nextDue - now) / 86400000);
+  let nextDue=start;
+  if(start < todayStart) {
+    const monthsElapsed = (todayStart.getFullYear() - start.getFullYear()) * 12
+                        + (todayStart.getMonth() - start.getMonth());
+    let cyclesDone=Math.max(0,Math.floor(monthsElapsed/freqMo));
+    nextDue=addMonthsClamped(start,cyclesDone*freqMo);
+    while(nextDue < todayStart) {
+      cyclesDone++;
+      nextDue=addMonthsClamped(start,cyclesDone*freqMo);
+    }
+  }
+  if(leaseEnd && nextDue > leaseEnd) return false;
+  const daysUntil = Math.round((nextDue - todayStart) / 86400000);
   return daysUntil >= 0 && daysUntil <= 7;
 }
 
 function fillPropDrops() {
-  const opts = load(K.props).map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('') || '<option value="">— Add a property first —</option>';
+  const opts = load(K.props).map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join('') || '<option value="">— Add a property first —</option>';
   ['t-prop','e-prop','mn-prop'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=opts });
 }
 
@@ -793,7 +860,7 @@ function renderDash() {
   const tens   = load(K.tens).filter(t => t.status === 'Active');
   const pays   = load(K.pays);
   const exps   = load(K.exps);
-  const c      = cur();
+  const c      = escapeHtml(cur());
 
   const mPays = pays.filter(p => { const d=new Date(p.datePaid); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear() });
   const mExps = exps.filter(e => { const d=new Date(e.date); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear() });
@@ -812,9 +879,11 @@ function renderDash() {
   let alerts = [], count = 0;
   tens.forEach(t => {
     const { balance } = tenStatus(t);
-    if (balance > 0) { alerts.push(`<div class="alert alert-red">⚠ <strong>${t.name}</strong> (${propName(t.propertyId)}) — <strong>${c} ${fmt(balance)}</strong> overdue</div>`); count++ }
-    else if (dueSoon(t)) { alerts.push(`<div class="alert alert-warn">🔔 <strong>${t.name}</strong>'s rent is due within 7 days</div>`); count++ }
-    if (t.leaseEnd) { const d=days(now,new Date(t.leaseEnd)); if(d>=0&&d<=30){ alerts.push(`<div class="alert alert-blue">📋 <strong>${t.name}</strong>'s lease expires in <strong>${d} day(s)</strong> — ${fmtD(t.leaseEnd)}</div>`); count++ } }
+    const name=escapeHtml(t.name);
+    const property=escapeHtml(propName(t.propertyId));
+    if (balance > 0) { alerts.push(`<div class="alert alert-red">⚠ <strong>${name}</strong> (${property}) — <strong>${c} ${fmt(balance)}</strong> overdue</div>`); count++ }
+    else if (dueSoon(t)) { alerts.push(`<div class="alert alert-warn">🔔 <strong>${name}</strong>'s rent is due within 7 days</div>`); count++ }
+    if (t.leaseEnd) { const d=days(now,new Date(t.leaseEnd)); if(d>=0&&d<=30){ alerts.push(`<div class="alert alert-blue">📋 <strong>${name}</strong>'s lease expires in <strong>${d} day(s)</strong> — ${fmtD(t.leaseEnd)}</div>`); count++ } }
   });
   document.getElementById('nb-dash').textContent = count; document.getElementById('nb-dash').style.display = count ? '' : 'none';
   document.getElementById('nb-rem').textContent  = count; document.getElementById('nb-rem').style.display  = count ? '' : 'none';
@@ -824,13 +893,13 @@ function renderDash() {
   const allTens = load(K.tens);
   const recent = [...pays].sort((a,b)=>new Date(b.datePaid)-new Date(a.datePaid)).slice(0,6);
   document.getElementById('dash-payments').innerHTML = recent.length
-    ? `<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Amount</th><th>Date</th></tr></thead><tbody>${recent.map(p=>{ const t=allTens.find(x=>x.id===p.tenantId); return `<tr><td class="fw7">${t?t.name:'—'}</td><td class="c-ok fw7">${c} ${fmt(p.amount)}</td><td>${fmtD(p.datePaid)}</td></tr>` }).join('')}</tbody></table></div>`
+    ? `<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Amount</th><th>Date</th></tr></thead><tbody>${recent.map(p=>{ const t=allTens.find(x=>x.id===p.tenantId); return `<tr><td class="fw7">${escapeHtml(t?.name||'—')}</td><td class="c-ok fw7">${c} ${fmt(p.amount)}</td><td>${fmtD(p.datePaid)}</td></tr>` }).join('')}</tbody></table></div>`
     : '<p class="c-muted fs13">No payments recorded yet.</p>';
 
   // Lease expiry
   const expiring = load(K.tens).filter(t=>{ if(!t.leaseEnd) return false; const d=days(now,new Date(t.leaseEnd)); return d>=0&&d<=60 }).sort((a,b)=>new Date(a.leaseEnd)-new Date(b.leaseEnd));
   document.getElementById('dash-leases').innerHTML = expiring.length
-    ? `<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Expires</th><th>Days</th></tr></thead><tbody>${expiring.map(t=>{ const d=days(now,new Date(t.leaseEnd)); return `<tr><td class="fw7">${t.name}</td><td>${fmtD(t.leaseEnd)}</td><td class="${d<=7?'c-bad':d<=30?'c-warn':''} fw7">${d}d</td></tr>` }).join('')}</tbody></table></div>`
+    ? `<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Expires</th><th>Days</th></tr></thead><tbody>${expiring.map(t=>{ const d=days(now,new Date(t.leaseEnd)); return `<tr><td class="fw7">${escapeHtml(t.name)}</td><td>${fmtD(t.leaseEnd)}</td><td class="${d<=7?'c-bad':d<=30?'c-warn':''} fw7">${d}d</td></tr>` }).join('')}</tbody></table></div>`
     : '<p class="c-muted fs13">No leases expiring within 60 days.</p>';
 }
 
@@ -867,7 +936,7 @@ function delProp(id) {
 }
 
 function renderProps() {
-  const props=load(K.props); const tens=load(K.tens); const c=cur();
+  const props=load(K.props); const tens=load(K.tens); const c=escapeHtml(cur());
   if(!props.length){ document.getElementById('prop-grid').innerHTML=`<div class="empty"><div class="ei">🏠</div><h3>No properties yet</h3><p>Add your first property to get started.</p><button class="btn btn-gold" onclick="openPropModal()">+ Add Property</button></div>`; return }
   document.getElementById('prop-grid').innerHTML=`<div class="prop-grid">${props.map(p=>{
     const tc=tens.filter(t=>t.propertyId===p.id&&t.status==='Active').length;
@@ -886,7 +955,7 @@ function renderProps() {
         <div class="ps-item"><div class="ps-val" style="color:var(--gold)">${occ}%</div><div class="ps-lbl">Occupied</div></div>
       </div>
       ${p.cost?`<p class="fs12 c-muted" style="margin-bottom:12px">Value: ${c} ${fmt(p.cost)}</p>`:''}
-      <div class="row"><button class="btn btn-ghost btn-sm" onclick="openPropModal('${p.id}')">✏ Edit</button><button class="btn btn-red btn-sm" onclick="delProp('${p.id}')">🗑</button></div>
+      <div class="row"><button class="btn btn-ghost btn-sm" onclick="openPropModal(${inlineArg(p.id)})">✏ Edit</button><button class="btn btn-red btn-sm" onclick="delProp(${inlineArg(p.id)})">🗑</button></div>
     </div>`
   }).join('')}</div>`;
 }
@@ -927,13 +996,13 @@ function calcLeaseEnd() {
   const start = document.getElementById('t-start').value;
   const dur   = document.getElementById('t-dur').value;
   if (!start || !dur) return;
-  const d = new Date(start);
-  const n = parseInt(dur);
-  if (dur.endsWith('m')) d.setMonth(d.getMonth() + n);
-  else if (dur.endsWith('y')) d.setFullYear(d.getFullYear() + n);
-  // subtract 1 day so end date is the last day of the tenancy
-  d.setDate(d.getDate() - 1);
-  document.getElementById('t-end').value = d.toISOString().split('T')[0];
+  const startDate=parseLocalDate(start);
+  if(!startDate) return;
+  const n=parseInt(dur,10);
+  const months=dur.endsWith('m')?n:dur.endsWith('y')?n*12:0;
+  const endDate=addMonthsClamped(startDate,months);
+  endDate.setDate(endDate.getDate()-1);
+  document.getElementById('t-end').value=`${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')}`;
 }
 
 function clearDur() {
@@ -947,12 +1016,15 @@ function saveTen() {
   const rent=document.getElementById('t-rent').value;
   const prop=document.getElementById('t-prop').value;
   const start=document.getElementById('t-start').value;
-  if(!name||!phone||!rent||!prop||!start){ toast('Please fill in all required fields','err'); return }
+  if(!name||!phone||!rent||!prop||!start||!Number.isFinite(Number(rent))||Number(rent)<=0){ toast('Enter tenant details and a rent amount greater than zero','err'); return }
 
   const arr=load(K.tens); const id=document.getElementById('t-id').value;
   const newEnd=document.getElementById('t-end').value;
   const newRent=Number(rent);
   const newFreq=document.getElementById('t-freq').value;
+  const startDate=parseLocalDate(start);
+  const endDate=newEnd?parseLocalDate(newEnd):null;
+  if(!startDate||(newEnd && !endDate)||(endDate && endDate<startDate)){ toast('Lease end date must be on or after the start date','err'); return }
 
   const ob={ id:id||uid(), name, phone,
     email:document.getElementById('t-email').value,
@@ -1091,6 +1163,12 @@ function renderTenants() {
   if(q) tens=tens.filter(t=>t.name.toLowerCase().includes(q)||(t.phone||'').includes(q)||propName(t.propertyId).toLowerCase().includes(q));
   const sBadge = s => s==='Active'?'b-green':s==='Inactive'?'b-gray':'b-red';
   document.getElementById('ten-body').innerHTML = tens.length ? tens.map(t=>{
+    const { total, leaseTotal } = tenStatus(t);
+    const c = escapeHtml(cur());
+    const leaseBalance = leaseTotal === null ? null : leaseTotal - total;
+    const leaseValue = leaseTotal !== null ? `${c} ${fmt(leaseTotal)}` : '—';
+    const balValue = leaseBalance === null ? '—' : leaseBalance > 0 ? `${c} ${fmt(leaseBalance)} due` : leaseBalance < 0 ? `${c} ${fmt(Math.abs(leaseBalance))} credit` : `${c} 0.00`;
+    const balClass = leaseBalance === null ? 'c-muted' : leaseBalance > 0 ? 'c-bad' : leaseBalance < 0 ? 'c-ok' : 'c-muted';
     const safeName=escapeHtml(t.name);
     const safePhone=escapeHtml(t.phone || '');
     const safeProp=escapeHtml(propName(t.propertyId));
@@ -1099,13 +1177,15 @@ function renderTenants() {
     <tr>
       <td><div class="fw7">${safeName}</div><div class="fs12 c-muted">${safePhone}</div></td>
       <td>${safeProp} <span class="c-muted">${safeUnit ? '/ '+safeUnit : ''}</span></td>
-      <td class="fw7">${cur()} ${fmt(t.rentAmount)}</td>
+      <td class="fw7">${c} ${fmt(t.rentAmount)}</td>
       <td>${escapeHtml(t.rentFrequency)}</td>
       <td>${fmtD(t.leaseEnd)}</td>
+      <td class="fw7">${leaseValue}</td>
+      <td class="fw7 ${balClass}">${balValue}</td>
       <td><span class="badge ${sBadge(t.status)}">${escapeHtml(t.status)}</span></td>
-      <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openTenModal('${t.id}')">✏</button><button class="btn btn-red btn-sm" onclick="delTen('${t.id}')">🗑</button></div></td>
+      <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openTenModal(${inlineArg(t.id)})">✏</button><button class="btn btn-red btn-sm" onclick="delTen(${inlineArg(t.id)})">🗑</button></div></td>
     </tr>`;
-  }).join('') : `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">No tenants found.</td></tr>`;
+  }).join('') : `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">No tenants found.</td></tr>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1115,7 +1195,7 @@ function openPayModal(tenId) {
   document.getElementById('pay-amt').value=''; document.getElementById('pay-ref').value=''; document.getElementById('pay-note').value='';
   document.getElementById('pay-date').value=today(); document.getElementById('pay-meth').value='Cash';
   const tens=load(K.tens).filter(t=>t.status==='Active');
-  document.getElementById('pay-ten').innerHTML=tens.map(t=>`<option value="${t.id}" ${t.id===tenId?'selected':''}>${escapeHtml(t.name)} — ${escapeHtml(propName(t.propertyId))}</option>`).join('');
+  document.getElementById('pay-ten').innerHTML=tens.map(t=>`<option value="${escapeHtml(t.id)}" ${t.id===tenId?'selected':''}>${escapeHtml(t.name)} — ${escapeHtml(propName(t.propertyId))}</option>`).join('');
   openMod('m-pay');
 }
 
@@ -1124,14 +1204,17 @@ function savePay() {
   const tenId=document.getElementById('pay-ten').value;
   const amt=document.getElementById('pay-amt').value;
   const date=document.getElementById('pay-date').value;
-  if(!tenId||!amt||!date){ toast('Please fill required fields','err'); return }
+  if(!tenId||!amt||!parseLocalDate(date)||!Number.isFinite(Number(amt))||Number(amt)<=0){ toast('Enter a payment amount greater than zero and a valid payment date','err'); return }
   const arr=load(K.pays);
   const newPay={ id:uid(), tenantId:tenId, amount:Number(amt), datePaid:date, method:document.getElementById('pay-meth').value, receiptNo:document.getElementById('pay-ref').value||('RCT-'+Date.now().toString(36).toUpperCase()), notes:document.getElementById('pay-note').value, createdAt:new Date().toISOString() };
   arr.push(newPay);
   save(K.pays,arr);
   _lastPayId = newPay.id;
   closeMod('m-pay');
+  renderDash();
   renderRent();
+  renderTenants();
+  renderRem();
   // Auto-show receipt
   const tenant=load(K.tens).find(t=>t.id===tenId);
   const prop=load(K.props).find(p=>p.id===tenant?.propertyId);
@@ -1149,15 +1232,15 @@ function showHist(tenId) {
   _histTenId = tenId;
   const t=load(K.tens).find(x=>x.id===tenId);
   const pays=[...load(K.pays).filter(p=>p.tenantId===tenId)].sort((a,b)=>new Date(b.datePaid)-new Date(a.datePaid));
-  const c=cur();
+  const c=escapeHtml(cur());
   document.getElementById('m-hist-title').textContent=`Payment History — ${t?.name}`;
   document.getElementById('hist-body').innerHTML = pays.length ? pays.map(p=>`
     <tr>
       <td>${fmtD(p.datePaid)}</td><td class="fw7 c-ok">${c} ${fmt(p.amount)}</td>
-      <td>${p.method}</td><td>${p.receiptNo||'—'}</td><td>${p.notes||'—'}</td>
+      <td>${escapeHtml(p.method)}</td><td>${escapeHtml(p.receiptNo||'—')}</td><td>${escapeHtml(p.notes||'—')}</td>
       <td><div class="row">
-        <button class="btn btn-navy btn-sm" onclick="printReceipt('${p.id}')">🧾</button>
-        <button class="btn btn-red btn-sm" onclick="delPay('${p.id}')">🗑</button>
+        <button class="btn btn-navy btn-sm" onclick="printReceipt(${inlineArg(p.id)})">🧾</button>
+        <button class="btn btn-red btn-sm" onclick="delPay(${inlineArg(p.id)})">🗑</button>
       </div></td>
     </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">No payments recorded.</td></tr>`;
   openMod('m-hist');
@@ -1166,7 +1249,11 @@ function showHist(tenId) {
 function delPay(id) {
   if(!confirm('Delete this payment?')) return;
   save(K.pays, load(K.pays).filter(p=>p.id!==id));
-  renderRent(); closeMod('m-hist'); toast('Payment deleted','warn');
+  renderDash();
+  renderRent();
+  renderTenants();
+  renderRem();
+  closeMod('m-hist'); toast('Payment deleted','warn');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1187,7 +1274,7 @@ function numToWords(n) {
 }
 
 function receiptHTML(pay, tenant, prop, s, single=true) {
-  const c=s.currency||'GHS';
+  const c=escapeHtml(s.currency||'GHS');
   const biz=escapeHtml(s.businessName||'Property Manager');
   const phone=escapeHtml(s.phone||'');
   const rno=escapeHtml(pay.receiptNo||('RCT-'+pay.id.slice(0,8).toUpperCase()));
@@ -1272,7 +1359,7 @@ function printAllReceipts() {
   const s=loadO(K.sets);
   const html = `
     <h2 style="text-align:center;font-family:Arial;color:#1a2744;margin-bottom:20px">
-      Payment Receipts — ${tenant?.name} (${pays.length} total)
+      Payment Receipts — ${escapeHtml(tenant?.name||'—')} (${pays.length} total)
     </h2>
     ${pays.map((p,i)=>
       receiptHTML(p,tenant,prop,s,false) +
@@ -1285,14 +1372,23 @@ function renderRent() {
   const q=document.getElementById('rent-search').value.toLowerCase();
   let tens=load(K.tens).filter(t=>t.status==='Active');
   if(q) tens=tens.filter(t=>t.name.toLowerCase().includes(q));
-  const c=cur();
+  const c=escapeHtml(cur());
   document.getElementById('rent-body').innerHTML = tens.length ? tens.map(t=>{
-    const { balance, lastPay, leaseTotal, leaseMonths } = tenStatus(t);
+    const { total, balance, lastPay, leaseTotal, leaseMonths } = tenStatus(t);
     const stCls = balance>0?'b-red':balance<0?'b-blue':'b-green';
     const stLbl = balance>0?'Overdue':balance<0?'Advance':'Paid';
     const leaseTotalDisplay = leaseTotal
       ? `<span title="${leaseMonths} months total">${c} ${fmt(leaseTotal)}</span>`
       : '—';
+    const leaseBalance = leaseTotal === null ? null : leaseTotal - total;
+    const leaseBalanceDisplay = leaseBalance === null ? '—'
+      : leaseBalance > 0 ? `${c} ${fmt(leaseBalance)} due`
+      : leaseBalance < 0 ? `${c} ${fmt(Math.abs(leaseBalance))} credit`
+      : `${c} 0.00`;
+    const leaseBalanceClass = leaseBalance === null ? 'c-muted'
+      : leaseBalance > 0 ? 'c-bad'
+      : leaseBalance < 0 ? 'c-ok'
+      : 'c-muted';
     const safeName=escapeHtml(t.name);
     const safeUnit=escapeHtml(t.unit || '');
     const safeProp=escapeHtml(propName(t.propertyId));
@@ -1302,12 +1398,13 @@ function renderRent() {
       <td>${safeProp}</td>
       <td class="fw7">${c} ${fmt(t.rentAmount)} / ${safeFreq}</td>
       <td class="fs12">${leaseTotalDisplay}</td>
+      <td class="fw7 ${leaseBalanceClass}">${leaseBalanceDisplay}</td>
       <td>${lastPay ? fmtD(lastPay.datePaid) : '<span class="c-muted">Never</span>'}</td>
       <td class="${balance>0?'c-bad':'c-ok'} fw7">${balance>0?'+':''}${c} ${fmt(Math.abs(balance))}</td>
       <td><span class="badge ${stCls}">${stLbl}</span></td>
-      <td><div class="row"><button class="btn btn-gold btn-sm" onclick="openPayModal('${t.id}')">+ Pay</button><button class="btn btn-ghost btn-sm" onclick="showHist('${t.id}')">📋</button></div></td>
+      <td><div class="row"><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">+ Pay</button><button class="btn btn-ghost btn-sm" onclick="showHist(${inlineArg(t.id)})">📋</button></div></td>
     </tr>`
-  }).join('') : `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">No active tenants.</td></tr>`;
+  }).join('') : `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">No active tenants.</td></tr>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1315,7 +1412,7 @@ function renderRent() {
 // ═══════════════════════════════════════════════════════════
 function renderRem() {
   const tens=load(K.tens).filter(t=>t.status==='Active');
-  const now=new Date(); const c=cur();
+  const now=new Date(); const c=escapeHtml(cur());
   let overdue=[], soon=[], expiring=[];
   tens.forEach(t => {
     const { balance }=tenStatus(t);
@@ -1338,17 +1435,17 @@ function renderRem() {
       const safeName=escapeHtml(t.name);
       const safePhone=escapeHtml(t.phone || '');
       const safeProp=escapeHtml(propName(t.propertyId));
-      return `<tr><td><div class="fw7">${safeName}</div><div class="fs12 c-muted">${safePhone}</div></td><td>${safeProp}</td><td class="c-bad fw7">${c} ${fmt(balance)} owed${leaseTotal?` <span class="fs12 c-muted">/ ${c} ${fmt(leaseTotal)} total lease</span>`:''}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal('${t.id}')">Record Payment</button></td></tr>`;
+      return `<tr><td><div class="fw7">${safeName}</div><div class="fs12 c-muted">${safePhone}</div></td><td>${safeProp}</td><td class="c-bad fw7">${c} ${fmt(balance)} owed${leaseTotal?` <span class="fs12 c-muted">/ ${c} ${fmt(leaseTotal)} total lease</span>`:''}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">Record Payment</button></td></tr>`;
     })+
     section('Due Within 7 Days','🔔','var(--warn)',soon, t=>{
       const safeName=escapeHtml(t.name);
       const safeProp=escapeHtml(propName(t.propertyId));
-      return `<tr><td class="fw7">${safeName}</td><td>${safeProp}</td><td>${c} ${fmt(t.rentAmount)} / ${escapeHtml(t.rentFrequency)}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal('${t.id}')">Record Payment</button></td></tr>`;
+      return `<tr><td class="fw7">${safeName}</td><td>${safeProp}</td><td>${c} ${fmt(t.rentAmount)} / ${escapeHtml(t.rentFrequency)}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">Record Payment</button></td></tr>`;
     })+
     section('Leases Expiring Within 30 Days','📋','var(--navy)',expiring, t=>{
       const safeName=escapeHtml(t.name);
       const safeProp=escapeHtml(propName(t.propertyId));
-      return `<tr><td class="fw7">${safeName}</td><td>${safeProp}</td><td>${fmtD(t.leaseEnd)} <span class="badge b-warn">${t.dLeft}d left</span></td><td><button class="btn btn-ghost btn-sm" onclick="openTenModal('${t.id}')">Update Lease</button></td></tr>`;
+      return `<tr><td class="fw7">${safeName}</td><td>${safeProp}</td><td>${fmtD(t.leaseEnd)} <span class="badge b-warn">${t.dLeft}d left</span></td><td><button class="btn btn-ghost btn-sm" onclick="openTenModal(${inlineArg(t.id)})">Update Lease</button></td></tr>`;
     });
 }
 
@@ -1372,7 +1469,7 @@ function openExpModal(id) {
 
 function saveExp() {
   const prop=document.getElementById('e-prop').value; const amt=document.getElementById('e-amt').value; const date=document.getElementById('e-date').value;
-  if(!prop||!amt||!date){ toast('Please fill required fields','err'); return }
+  if(!prop||!amt||!parseLocalDate(date)||!Number.isFinite(Number(amt))||Number(amt)<=0){ toast('Enter an expense amount greater than zero and a valid date','err'); return }
   const arr=load(K.exps); const id=document.getElementById('e-id').value;
   const ob={ id:id||uid(), propertyId:prop, type:document.getElementById('e-type').value, amount:Number(amt), date, vendor:document.getElementById('e-vendor').value, receiptNo:document.getElementById('e-ref').value, description:document.getElementById('e-desc').value, createdAt:new Date().toISOString() };
   if(id){ const i=arr.findIndex(x=>x.id===id); arr[i]=ob } else arr.push(ob);
@@ -1386,12 +1483,12 @@ function delExp(id) {
 
 function renderExp() {
   const exps=[...load(K.exps)].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  const now=new Date(); const c=cur();
+  const now=new Date(); const c=escapeHtml(cur());
   const mE=exps.filter(e=>{const d=new Date(e.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()});
   const yE=exps.filter(e=>new Date(e.date).getFullYear()===now.getFullYear());
   document.getElementById('exp-stats').innerHTML=`
-    <div class="stat-card"><div class="stat-ic ic-red">📅</div><div><div class="stat-val">${c} ${fmt(mE.reduce((s,e)=>s+e.amount,0))}</div><div class="stat-lbl">This Month</div></div></div>
-    <div class="stat-card"><div class="stat-ic ic-navy">📆</div><div><div class="stat-val">${c} ${fmt(yE.reduce((s,e)=>s+e.amount,0))}</div><div class="stat-lbl">This Year</div></div></div>
+    <div class="stat-card"><div class="stat-ic ic-red">📅</div><div><div class="stat-val">${c} ${fmt(mE.reduce((s,e)=>s+Number(e.amount),0))}</div><div class="stat-lbl">This Month</div></div></div>
+    <div class="stat-card"><div class="stat-ic ic-navy">📆</div><div><div class="stat-val">${c} ${fmt(yE.reduce((s,e)=>s+Number(e.amount),0))}</div><div class="stat-lbl">This Year</div></div></div>
     <div class="stat-card"><div class="stat-ic ic-gold">🧾</div><div><div class="stat-val">${exps.length}</div><div class="stat-lbl">Total Records</div></div></div>`;
   document.getElementById('exp-body').innerHTML = exps.length ? exps.map(e=>{
     const safeType=escapeHtml(e.type);
@@ -1404,7 +1501,7 @@ function renderExp() {
       <td><span class="badge b-blue">${safeType}</span></td>
       <td>${safeDesc}</td><td>${safeVendor}</td>
       <td class="fw7 c-bad">${c} ${fmt(e.amount)}</td>
-      <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openExpModal('${e.id}')">✏</button><button class="btn btn-red btn-sm" onclick="delExp('${e.id}')">🗑</button></div></td>
+      <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openExpModal(${inlineArg(e.id)})">✏</button><button class="btn btn-red btn-sm" onclick="delExp(${inlineArg(e.id)})">🗑</button></div></td>
     </tr>`;
   }).join('') : `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">No expenses recorded yet.</td></tr>`;
 }
@@ -1434,7 +1531,8 @@ function openMaintModal(id) {
 
 function saveMaint() {
   const prop=document.getElementById('mn-prop').value; const title=document.getElementById('mn-title').value.trim(); const rep=document.getElementById('mn-reported').value;
-  if(!prop||!title||!rep){ toast('Please fill required fields','err'); return }
+  const cost=document.getElementById('mn-cost').value;
+  if(!prop||!title||!parseLocalDate(rep)|| (cost && (!Number.isFinite(Number(cost))||Number(cost)<0))){ toast('Enter the required job details and a valid non-negative cost','err'); return }
   const arr=load(K.maints); const id=document.getElementById('mn-id').value;
   const ob={ id:id||uid(), propertyId:prop, unit:document.getElementById('mn-unit').value, title, priority:document.getElementById('mn-pri').value, dateReported:rep, dateFixed:document.getElementById('mn-fixed').value, contractor:document.getElementById('mn-con').value, contractorPhone:document.getElementById('mn-conph').value, cost:document.getElementById('mn-cost').value, status:document.getElementById('mn-status').value, description:document.getElementById('mn-desc').value, createdAt:new Date().toISOString() };
   if(id){ const i=arr.findIndex(x=>x.id===id); arr[i]=ob } else arr.push(ob);
@@ -1449,7 +1547,7 @@ function delMaint(id) {
 function renderMaint() {
   let list=[...load(K.maints)].sort((a,b)=>new Date(b.dateReported)-new Date(a.dateReported));
   if(mFilt!=='all') list=list.filter(m=>m.status===mFilt);
-  const c=cur();
+  const c=escapeHtml(cur());
   const priBdg=p=>p==='Emergency'?'b-red':p==='High'?'b-warn':p==='Medium'?'b-blue':'b-gray';
   const stBdg=s=>s==='Completed'?'b-green':s==='In Progress'?'b-warn':'b-gray';
   document.getElementById('maint-body').innerHTML = list.length ? list.map(m=>{
@@ -1468,7 +1566,7 @@ function renderMaint() {
       <td>${safeContractor}${safeContractorPhone?`<br><span class="fs12 c-muted">${safeContractorPhone}</span>`:''}</td>
       <td>${m.cost?`${c} ${fmt(m.cost)}`:'—'}</td>
       <td><span class="badge ${stBdg(m.status)}">${escapeHtml(m.status)}</span></td>
-      <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openMaintModal('${m.id}')">✏</button><button class="btn btn-red btn-sm" onclick="delMaint('${m.id}')">🗑</button></div></td>
+      <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openMaintModal(${inlineArg(m.id)})">✏</button><button class="btn btn-red btn-sm" onclick="delMaint(${inlineArg(m.id)})">🗑</button></div></td>
     </tr>`;
   }).join('') : `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">No jobs found.</td></tr>`;
 }
@@ -1484,13 +1582,15 @@ function renderReports() {
   const exps=load(K.exps).filter(e=>new Date(e.date).getFullYear()===year);
   const tens=load(K.tens).filter(t=>t.status==='Active');
   const props=load(K.props);
-  const c=cur();
+  const c=escapeHtml(cur());
 
-  const totInc=pays.reduce((s,p)=>s+p.amount,0);
-  const totExp=exps.reduce((s,e)=>s+e.amount,0);
+  const totInc=pays.reduce((s,p)=>s+Number(p.amount),0);
+  const totExp=exps.reduce((s,e)=>s+Number(e.amount),0);
   const net=totInc-totExp;
-  const moRent=tens.reduce((s,t)=>s+t.rentAmount,0);
-  const rate=moRent*12>0?Math.round(totInc/(moRent*12)*100):0;
+  const annualRent=t=>Number(t.rentAmount)*(12/(t.rentFrequency==='Quarterly'?3:t.rentFrequency==='Annually'?12:1));
+  const annualExpected=tens.reduce((s,t)=>s+annualRent(t),0);
+  const moRent=annualExpected/12;
+  const rate=annualExpected>0?Math.round(totInc/annualExpected*100):0;
 
   document.getElementById('rep-stats').innerHTML=`
     <div class="stat-card"><div class="stat-ic ic-green">💰</div><div><div class="stat-val">${c} ${fmt(totInc)}</div><div class="stat-lbl">Total Income ${year}</div></div></div>
@@ -1500,8 +1600,8 @@ function renderReports() {
 
   const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const rows=MO.map((m,i)=>{
-    const mI=pays.filter(p=>new Date(p.datePaid).getMonth()===i).reduce((s,p)=>s+p.amount,0);
-    const mE=exps.filter(e=>new Date(e.date).getMonth()===i).reduce((s,e)=>s+e.amount,0);
+    const mI=pays.filter(p=>new Date(p.datePaid).getMonth()===i).reduce((s,p)=>s+Number(p.amount),0);
+    const mE=exps.filter(e=>new Date(e.date).getMonth()===i).reduce((s,e)=>s+Number(e.amount),0);
     const mEx=moRent; const mN=mI-mE; const mR=mEx>0?Math.round(mI/mEx*100):0;
     return { m, mI, mE, mEx, mN, mR };
   });
@@ -1546,7 +1646,7 @@ function renderReports() {
     const W2=c2.width, H2=c2.height, pd2={t:20,r:20,b:60,l:50};
     const cW2=W2-pd2.l-pd2.r, cH2=H2-pd2.t-pd2.b;
     ctx2.clearRect(0,0,W2,H2);
-    const pData=props.map(p=>{ const pT=tens.filter(t=>t.propertyId===p.id); const pP=pays.filter(pay=>pT.some(t=>t.id===pay.tenantId)); const exp=pT.reduce((s,t)=>s+t.rentAmount*12,0); const col=pP.reduce((s,p)=>s+p.amount,0); return { name:p.name.slice(0,10), pct:exp>0?Math.min(100,Math.round(col/exp*100)):0 } });
+    const pData=props.map(p=>{ const pT=tens.filter(t=>t.propertyId===p.id); const pP=pays.filter(pay=>pT.some(t=>t.id===pay.tenantId)); const exp=pT.reduce((s,t)=>s+annualRent(t),0); const col=pP.reduce((s,p)=>s+Number(p.amount),0); return { name:p.name.slice(0,10), pct:exp>0?Math.min(100,Math.round(col/exp*100)):0 } });
     if(pData.length){
       const bw2=Math.min(60,(cW2/pData.length)*0.6);
       pData.forEach((p,i)=>{
@@ -2021,9 +2121,9 @@ function renderNotes() {
       <div class="note-preview">${safePreview}</div>
       <div class="note-footer">
         <span class="fs12 c-muted">${fmtD(n.updatedAt)}</span>
-        <button class="btn btn-ghost btn-sm ml-a" onclick="copyNote('${n.id}')">📋 Copy</button>
-        <button class="btn btn-ghost btn-sm" onclick="openNoteModal('${n.id}')">✏</button>
-        <button class="btn btn-red btn-sm" onclick="delNote('${n.id}')">🗑</button>
+        <button class="btn btn-ghost btn-sm ml-a" onclick="copyNote(${inlineArg(n.id)})">📋 Copy</button>
+        <button class="btn btn-ghost btn-sm" onclick="openNoteModal(${inlineArg(n.id)})">✏</button>
+        <button class="btn btn-red btn-sm" onclick="delNote(${inlineArg(n.id)})">🗑</button>
       </div>
     </div>`;
   }).join('')}</div>`
@@ -2071,41 +2171,113 @@ function toggleDark(el) {
 // BACKUP
 // ═══════════════════════════════════════════════════════════
 function exportBackup() {
-  const data={}; Object.entries(K).forEach(([k,v])=>{ data[k]=JSON.parse(localStorage.getItem(v)||'[]') });
+  const data={};
+  try {
+    Object.entries(K).forEach(([k,v])=>{ data[k]=JSON.parse(localStorage.getItem(v)||(k==='sets'?'{}':'[]')) });
+    if(!isValidBackup(data)) throw new Error('Stored data does not match the backup format');
+  } catch(error) {
+    console.error('Backup export failed',error);
+    toast('Could not export backup because stored data is unreadable or invalid','err');
+    return;
+  }
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download=`propmanager-backup-${today()}.json`; a.click();
   toast('Backup exported','ok');
 }
 
+function isValidBackup(data) {
+  if(!data || typeof data!=='object' || Array.isArray(data)) return false;
+  const schemas={
+    props:{ strings:['id','name','address','type'] },
+    tens:{ strings:['id','name','phone','propertyId','rentFrequency','leaseStart','status'], numbers:['rentAmount'], dates:['leaseStart'] },
+    pays:{ strings:['id','tenantId','datePaid','method'], numbers:['amount'], dates:['datePaid'] },
+    exps:{ strings:['id','propertyId','type','date'], numbers:['amount'], dates:['date'] },
+    maints:{ strings:['id','propertyId','title','priority','dateReported','status'], dates:['dateReported'] },
+    notes:{ strings:['id','title','body'] }
+  };
+  const keys=Object.keys(K);
+  if(!keys.some(key=>Object.prototype.hasOwnProperty.call(data,key))) return false;
+  for(const [key,schema] of Object.entries(schemas)) {
+    if(!Object.prototype.hasOwnProperty.call(data,key)) continue;
+    if(!Array.isArray(data[key])) return false;
+    for(const record of data[key]) {
+      if(!record || typeof record!=='object' || Array.isArray(record)) return false;
+      if(schema.strings.some(field=>typeof record[field]!=='string' || (field!=='body' && !record[field].trim()))) return false;
+      if(schema.numbers?.some(field=>typeof record[field]!=='number' || !Number.isFinite(record[field]) || record[field]<=0)) return false;
+      if(schema.dates?.some(field=>!parseLocalDate(record[field]))) return false;
+      if(key==='tens' && record.leaseEnd && !parseLocalDate(record.leaseEnd)) return false;
+    }
+  }
+  if(Object.prototype.hasOwnProperty.call(data,'sets')) {
+    const sets=data.sets;
+    if(!sets || typeof sets!=='object' || Array.isArray(sets)) return false;
+    if(['businessName','currency','phone'].some(field=>sets[field]!==undefined && typeof sets[field]!=='string')) return false;
+    if(sets.dark!==undefined && typeof sets.dark!=='boolean') return false;
+  }
+  return true;
+}
+
 function importBackup(input) {
   const file=input.files[0]; if(!file) return;
   const r=new FileReader();
   r.onload=e=>{
+    let data;
+    try { data=JSON.parse(e.target.result) }
+    catch { toast('Backup file is not valid JSON','err'); return }
+    if(!isValidBackup(data)){ toast('Backup data has an invalid structure','err'); return }
+    if(!confirm('This will replace ALL current data. Are you sure?')) return;
+
+    const keys=[...Object.values(K),'pm_demo_ok'];
+    const previous=new Map(keys.map(key=>[key,localStorage.getItem(key)]));
+    const previousErrors=new Set(storageErrors);
+    storageErrors.clear();
     try {
-      const data=JSON.parse(e.target.result);
-      if(!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid backup structure');
-      const hasValidKey = Object.keys(K).some(k => Object.prototype.hasOwnProperty.call(data, k));
-      if(!hasValidKey) throw new Error('No valid PropManager backup data found');
-      if(confirm('This will replace ALL current data. Are you sure?')){
-        Object.values(K).forEach(v => localStorage.removeItem(v));
-        localStorage.removeItem('pm_demo_ok');
-        Object.entries(K).forEach(([k,v]) => {
-          if(Object.prototype.hasOwnProperty.call(data, k) && data[k] !== undefined) save(v, data[k]);
-        });
-        toast('Backup restored successfully','ok'); renderDash();
+      for(const [key,storageKey] of Object.entries(K)) {
+        if(Object.prototype.hasOwnProperty.call(data,key)) localStorage.setItem(storageKey,JSON.stringify(data[key]));
+        else localStorage.removeItem(storageKey);
       }
-    } catch { toast('Invalid backup file','err') }
+      localStorage.removeItem('pm_demo_ok');
+    } catch(error) {
+      const rollbackErrors=[];
+      for(const [key,value] of previous) {
+        try {
+          if(value===null) localStorage.removeItem(key);
+          else localStorage.setItem(key,value);
+        } catch(rollbackError) { rollbackErrors.push(rollbackError) }
+      }
+      storageErrors.clear();
+      previousErrors.forEach(key=>storageErrors.add(key));
+      console.error('Backup restore failed',error);
+      toast(rollbackErrors.length?'Restore failed; some previous data could not be recovered':'Restore failed; previous data was restored','err');
+      return;
+    }
+    toast('Backup restored successfully','ok');
+    renderDash();
+    const activeSection=document.querySelector('.section.active')?.id.replace('section-','');
+    if(activeSection && activeSection!=='dashboard' && renders[activeSection]) renders[activeSection]();
   };
+  r.onerror=()=>toast('Could not read backup file','err');
   r.readAsText(file);
 }
 
 function exportCSV() {
   const pays=load(K.pays); const tens=load(K.tens); const exps=load(K.exps); const c=cur();
-  let csv=`Type,Date,Name,Property,Amount (${c}),Method/Type,Notes\n`;
-  pays.forEach(p=>{ const t=tens.find(x=>x.id===p.tenantId); csv+=`Income,${p.datePaid},${t?t.name:'Unknown'},${propName(t?.propertyId)},${p.amount},${p.method},${p.notes||''}\n` });
-  exps.forEach(e=>{ csv+=`Expense,${e.date},${e.vendor||''},${propName(e.propertyId)},-${e.amount},${e.type},${e.description||''}\n` });
-  const blob=new Blob([csv],{type:'text/csv'});
+  if(storageErrors.size){ toast('CSV export stopped because stored data is unreadable','err'); return }
+  const csvCell=(value,protectFormula=true)=>{
+    const text=String(value??'');
+    const safe=protectFormula && /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text;
+    return `"${safe.replace(/"/g,'""')}"`;
+  };
+  const rows=[[`Type`,`Date`,`Name`,`Property`,`Amount (${c})`,`Method/Type`,`Notes`].map(value=>csvCell(value,false)).join(',')];
+  pays.forEach(p=>{
+    const t=tens.find(x=>x.id===p.tenantId);
+    rows.push([csvCell('Income'),csvCell(p.datePaid),csvCell(t?t.name:'Unknown'),csvCell(propName(t?.propertyId)),csvCell(Number(p.amount),false),csvCell(p.method),csvCell(p.notes||'')].join(','));
+  });
+  exps.forEach(e=>{
+    rows.push([csvCell('Expense'),csvCell(e.date),csvCell(e.vendor||''),csvCell(propName(e.propertyId)),csvCell(-Number(e.amount),false),csvCell(e.type),csvCell(e.description||'')].join(','));
+  });
+  const blob=new Blob([rows.join('\r\n')],{type:'text/csv'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download=`propmanager-report-${today()}.csv`; a.click();
   toast('CSV exported','ok');
@@ -2113,7 +2285,7 @@ function exportCSV() {
 
 function clearDemo() {
   if(!confirm('Remove demo data?')) return;
-  Object.values(K).forEach(v=>{ const arr=load(v); if(Array.isArray(arr)) save(v,arr.filter(x=>!x._demo)) });
+  Object.entries(K).filter(([key])=>key!=='sets').forEach(([,v])=>{ const arr=load(v); save(v,arr.filter(x=>!x._demo)) });
   toast('Demo data removed','warn'); renderDash();
 }
 
@@ -2121,6 +2293,7 @@ function clearAll() {
   if(!confirm('DELETE ALL DATA? This cannot be undone!')) return;
   if(!confirm('Final confirmation — all records will be permanently lost.')) return;
   Object.values(K).forEach(v=>localStorage.removeItem(v));
+  storageErrors.clear();
   localStorage.removeItem('pm_demo_ok'); toast('All data cleared','warn'); renderDash();
 }
 
@@ -2133,10 +2306,11 @@ function loadDemo() {
   const existingProps = load(K.props).filter(p => !p._demo);
   const hasPersistedData = Object.values(K).some(key => {
     try {
-      const parsed = JSON.parse(localStorage.getItem(key) || '[]');
-      return Array.isArray(parsed) ? parsed.length > 0 : !!parsed;
+      const parsed = JSON.parse(localStorage.getItem(key) || (key===K.sets?'{}':'[]'));
+      if(key===K.sets) return !parsed || typeof parsed!=='object' || Array.isArray(parsed) || Object.keys(parsed).length>0;
+      return Array.isArray(parsed) ? parsed.length > 0 : true;
     } catch {
-      return false;
+      return true;
     }
   });
   if (existingProps.length || existingTens.length || hasPersistedData) return; // User has real data — skip demo
@@ -2211,7 +2385,9 @@ function loadDemo() {
 (function init() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js').catch(error => {
+        console.error('Service worker registration failed',error);
+      });
     });
   }
   loadDemo();
@@ -2220,7 +2396,9 @@ function loadDemo() {
   document.body.classList.toggle('dark', !!s.dark);
   const darkToggle = document.getElementById('s-dark');
   if (darkToggle) darkToggle.checked = !!s.dark;
-  renderDash();
+  const initialSection=location.hash.slice(1);
+  if(renders[initialSection]) nav(initialSection);
+  else renderDash();
   // ── Resize: throttled with requestAnimationFrame to prevent jank ──
   let _resizeRaf;
   window.addEventListener('resize', () => {
