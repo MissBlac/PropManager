@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="90" fill="#1a2744"/>
+
+  <!-- Kente strip top -->
+  <rect x="0" y="0" width="512" height="36" rx="0" fill="#006B3F"/>
+  <rect x="85" y="0" width="85" height="36" fill="#FCD116"/>
+  <rect x="170" y="0" width="85" height="36" fill="#CE1126"/>
+  <rect x="255" y="0" width="85" height="36" fill="#000000"/>
+  <rect x="340" y="0" width="85" height="36" fill="#FCD116"/>
+  <rect x="425" y="0" width="87" height="36" fill="#006B3F"/>
+  <!-- Rounded top corners over kente -->
+  <rect x="0" y="0" width="90" height="90" rx="90" fill="#1a2744"/>
+  <rect x="422" y="0" width="90" height="90" rx="90" fill="#1a2744"/>
+  <rect x="20" y="0" width="70" height="40" fill="#006B3F"/>
+  <rect x="422" y="0" width="70" height="40" fill="#006B3F"/>
+
+  <!-- House / building shape -->
+  <polygon points="256,110 370,200 370,370 142,370 142,200" fill="#243461"/>
+  <!-- Roof -->
+  <polygon points="120,210 256,100 392,210" fill="#f0a500"/>
+  <!-- Door -->
+  <rect x="220" y="280" width="72" height="90" rx="8" fill="#1a2744"/>
+  <circle cx="282" cy="326" r="5" fill="#f0a500"/>
+  <!-- Windows -->
+  <rect x="158" y="240" width="54" height="50" rx="6" fill="#f0a500" opacity="0.85"/>
+  <rect x="300" y="240" width="54" height="50" rx="6" fill="#f0a500" opacity="0.85"/>
+  <!-- Window cross -->
+  <line x1="185" y1="240" x2="185" y2="290" stroke="#1a2744" stroke-width="3"/>
+  <line x1="158" y1="265" x2="212" y2="265" stroke="#1a2744" stroke-width="3"/>
+  <line x1="327" y1="240" x2="327" y2="290" stroke="#1a2744" stroke-width="3"/>
+  <line x1="300" y1="265" x2="354" y2="265" stroke="#1a2744" stroke-width="3"/>
+
+  <!-- Ground line -->
+  <rect x="100" y="368" width="312" height="10" rx="5" fill="#f0a500" opacity="0.5"/>
+
+  <!-- GH flag star (small, centered below house) -->
+  <text x="256" y="445" font-size="48" text-anchor="middle" font-family="Arial">🇬🇭</text>
+
+  <!-- Kente strip bottom -->
+  <rect x="0" y="476" width="512" height="36" fill="#006B3F"/>
+  <rect x="85" y="476" width="85" height="36" fill="#FCD116"/>
+  <rect x="170" y="476" width="85" height="36" fill="#CE1126"/>
+  <rect x="255" y="476" width="85" height="36" fill="#000000"/>
+  <rect x="340" y="476" width="85" height="36" fill="#FCD116"/>
+  <rect x="425" y="476" width="87" height="36" fill="#006B3F"/>
+  <!-- Rounded bottom corners over kente -->
+  <rect x="0" y="422" width="90" height="90" rx="90" fill="#1a2744"/>
+  <rect x="422" y="422" width="90" height="90" rx="90" fill="#1a2744"/>
+  <rect x="20" y="472" width="70" height="40" fill="#006B3F"/>
+  <rect x="422" y="472" width="70" height="40" fill="#006B3F"/>
+</svg>

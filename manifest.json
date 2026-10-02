@@ -1,0 +1,50 @@
+{
+  "name": "PropManager — Landlord App",
+  "short_name": "PropManager",
+  "description": "Offline landlord property management app — built for Ghana",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1a2744",
+  "theme_color": "#f0a500",
+  "orientation": "any",
+  "lang": "en",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Rent Tracker",
+      "short_name": "Rent",
+      "description": "Record a rent payment",
+      "url": "./index.html#rent",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Reminders",
+      "short_name": "Alerts",
+      "description": "View overdue and upcoming rent",
+      "url": "./index.html#reminders",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    }
+  ]
+}
