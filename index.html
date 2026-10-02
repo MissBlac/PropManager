@@ -725,6 +725,7 @@ const fmtD  = d => d ? new Date(d).toLocaleDateString('en-GB', {day:'2-digit', m
 const today = () => new Date().toISOString().split('T')[0];
 const days  = (d1, d2) => Math.round((new Date(d2) - new Date(d1)) / 86400000);
 const propName = id => (load(K.props).find(p => p.id === id) || {}).name || '—';
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[ch]));
 
 function tenStatus(t) {
   const pays    = load(K.pays).filter(p => p.tenantId === t.id);
@@ -778,7 +779,7 @@ function dueSoon(t) {
 }
 
 function fillPropDrops() {
-  const opts = load(K.props).map(p => `<option value="${p.id}">${p.name}</option>`).join('') || '<option value="">— Add a property first —</option>';
+  const opts = load(K.props).map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('') || '<option value="">— Add a property first —</option>';
   ['t-prop','e-prop','mn-prop'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=opts });
 }
 
@@ -871,10 +872,13 @@ function renderProps() {
   document.getElementById('prop-grid').innerHTML=`<div class="prop-grid">${props.map(p=>{
     const tc=tens.filter(t=>t.propertyId===p.id&&t.status==='Active').length;
     const occ=p.units?Math.min(100,Math.round(tc/p.units*100)):0;
+    const safeName=escapeHtml(p.name);
+    const safeAddress=escapeHtml(p.address);
+    const safeType=escapeHtml(p.type);
     return `<div class="prop-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div><h3>${p.name}</h3><div class="addr">${p.address}</div></div>
-        <span class="badge b-blue">${p.type}</span>
+        <div><h3>${safeName}</h3><div class="addr">${safeAddress}</div></div>
+        <span class="badge b-blue">${safeType}</span>
       </div>
       <div class="prop-stats">
         <div class="ps-item"><div class="ps-val">${p.units||'—'}</div><div class="ps-lbl">Units</div></div>
@@ -1086,16 +1090,22 @@ function renderTenants() {
   let tens=load(K.tens);
   if(q) tens=tens.filter(t=>t.name.toLowerCase().includes(q)||(t.phone||'').includes(q)||propName(t.propertyId).toLowerCase().includes(q));
   const sBadge = s => s==='Active'?'b-green':s==='Inactive'?'b-gray':'b-red';
-  document.getElementById('ten-body').innerHTML = tens.length ? tens.map(t=>`
+  document.getElementById('ten-body').innerHTML = tens.length ? tens.map(t=>{
+    const safeName=escapeHtml(t.name);
+    const safePhone=escapeHtml(t.phone || '');
+    const safeProp=escapeHtml(propName(t.propertyId));
+    const safeUnit=escapeHtml(t.unit || '');
+    return `
     <tr>
-      <td><div class="fw7">${t.name}</div><div class="fs12 c-muted">${t.phone}</div></td>
-      <td>${propName(t.propertyId)} <span class="c-muted">${t.unit?'/ '+t.unit:''}</span></td>
+      <td><div class="fw7">${safeName}</div><div class="fs12 c-muted">${safePhone}</div></td>
+      <td>${safeProp} <span class="c-muted">${safeUnit ? '/ '+safeUnit : ''}</span></td>
       <td class="fw7">${cur()} ${fmt(t.rentAmount)}</td>
-      <td>${t.rentFrequency}</td>
+      <td>${escapeHtml(t.rentFrequency)}</td>
       <td>${fmtD(t.leaseEnd)}</td>
-      <td><span class="badge ${sBadge(t.status)}">${t.status}</span></td>
+      <td><span class="badge ${sBadge(t.status)}">${escapeHtml(t.status)}</span></td>
       <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openTenModal('${t.id}')">✏</button><button class="btn btn-red btn-sm" onclick="delTen('${t.id}')">🗑</button></div></td>
-    </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">No tenants found.</td></tr>`;
+    </tr>`;
+  }).join('') : `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">No tenants found.</td></tr>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1105,7 +1115,7 @@ function openPayModal(tenId) {
   document.getElementById('pay-amt').value=''; document.getElementById('pay-ref').value=''; document.getElementById('pay-note').value='';
   document.getElementById('pay-date').value=today(); document.getElementById('pay-meth').value='Cash';
   const tens=load(K.tens).filter(t=>t.status==='Active');
-  document.getElementById('pay-ten').innerHTML=tens.map(t=>`<option value="${t.id}" ${t.id===tenId?'selected':''}>${t.name} — ${propName(t.propertyId)}</option>`).join('');
+  document.getElementById('pay-ten').innerHTML=tens.map(t=>`<option value="${t.id}" ${t.id===tenId?'selected':''}>${escapeHtml(t.name)} — ${escapeHtml(propName(t.propertyId))}</option>`).join('');
   openMod('m-pay');
 }
 
@@ -1178,9 +1188,15 @@ function numToWords(n) {
 
 function receiptHTML(pay, tenant, prop, s, single=true) {
   const c=s.currency||'GHS';
-  const biz=s.businessName||'Property Manager';
-  const phone=s.phone||'';
-  const rno=pay.receiptNo||('RCT-'+pay.id.slice(0,8).toUpperCase());
+  const biz=escapeHtml(s.businessName||'Property Manager');
+  const phone=escapeHtml(s.phone||'');
+  const rno=escapeHtml(pay.receiptNo||('RCT-'+pay.id.slice(0,8).toUpperCase()));
+  const tenantName=escapeHtml(tenant?.name || '—');
+  const tenantPhone=escapeHtml(tenant?.phone || '—');
+  const propNameText=escapeHtml(prop?.name || '—');
+  const unitText=escapeHtml(tenant?.unit || '—');
+  const noteText=escapeHtml(pay.notes || '');
+  const sigName=escapeHtml(tenant?.name || '');
   const kente=`repeating-linear-gradient(90deg,#006B3F 0,#006B3F 10px,#FCD116 10px,#FCD116 20px,#CE1126 20px,#CE1126 30px,#000 30px,#000 38px,#FCD116 38px,#FCD116 48px,#006B3F 48px,#006B3F 58px)`;
   const block=`
   <div style="border:2px solid #1a2744;border-radius:10px;padding:0;overflow:hidden;max-width:540px;margin:0 auto ${single?'':'20px'};font-family:Arial,sans-serif">
@@ -1199,19 +1215,19 @@ function receiptHTML(pay, tenant, prop, s, single=true) {
       </div>
       <div style="height:1px;background:#e2e8f0;margin-bottom:16px"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;font-size:13px">
-        <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Received From</span><br><strong>${tenant?.name||'—'}</strong></div>
-        <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Phone</span><br><strong>${tenant?.phone||'—'}</strong></div>
-        <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Property</span><br><strong>${prop?.name||'—'}</strong></div>
-        <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Unit / Room</span><br><strong>${tenant?.unit||'—'}</strong></div>
+        <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Received From</span><br><strong>${tenantName}</strong></div>
+        <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Phone</span><br><strong>${tenantPhone}</strong></div>
+        <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Property</span><br><strong>${propNameText}</strong></div>
+        <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Unit / Room</span><br><strong>${unitText}</strong></div>
         <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Payment For</span><br><strong>Rent — ${new Date(pay.datePaid).toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</strong></div>
-        <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Payment Method</span><br><strong>${pay.method}</strong></div>
+        <div><span style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:.5px">Payment Method</span><br><strong>${escapeHtml(pay.method)}</strong></div>
       </div>
       <div style="background:#f0a500;border-radius:8px;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <span style="font-size:13px;font-weight:700;color:#1a2744">AMOUNT RECEIVED</span>
         <span style="font-size:22px;font-weight:700;color:#1a2744">${c} ${fmt(pay.amount)}</span>
       </div>
       <div style="font-size:12px;color:#4a5568;font-style:italic;margin-bottom:16px">In words: ${numToWords(pay.amount)}</div>
-      ${pay.notes?`<div style="font-size:12px;color:#718096;margin-bottom:14px">Note: ${pay.notes}</div>`:''}
+      ${pay.notes?`<div style="font-size:12px;color:#718096;margin-bottom:14px">Note: ${noteText}</div>`:''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;padding-top:16px;border-top:1px dashed #e2e8f0">
         <div style="text-align:center">
           <div style="border-top:1px solid #1a2744;padding-top:6px;font-size:11px;color:#718096">Landlord / Authorised Signature</div>
@@ -1219,7 +1235,7 @@ function receiptHTML(pay, tenant, prop, s, single=true) {
         </div>
         <div style="text-align:center">
           <div style="border-top:1px solid #1a2744;padding-top:6px;font-size:11px;color:#718096">Tenant Signature</div>
-          <div style="font-size:12px;font-weight:600;margin-top:4px">${tenant?.name||''}</div>
+          <div style="font-size:12px;font-weight:600;margin-top:4px">${sigName}</div>
         </div>
       </div>
       <div style="text-align:center;margin-top:14px;font-size:10px;color:#a0aec0">🇬🇭 This receipt is issued in accordance with Ghana's Rent Act 1963 (Act 220) · Keep this receipt as proof of payment</div>
@@ -1277,10 +1293,14 @@ function renderRent() {
     const leaseTotalDisplay = leaseTotal
       ? `<span title="${leaseMonths} months total">${c} ${fmt(leaseTotal)}</span>`
       : '—';
+    const safeName=escapeHtml(t.name);
+    const safeUnit=escapeHtml(t.unit || '');
+    const safeProp=escapeHtml(propName(t.propertyId));
+    const safeFreq=escapeHtml(t.rentFrequency);
     return `<tr>
-      <td><div class="fw7">${t.name}</div><div class="fs12 c-muted">${t.unit||''}</div></td>
-      <td>${propName(t.propertyId)}</td>
-      <td class="fw7">${c} ${fmt(t.rentAmount)} / ${t.rentFrequency}</td>
+      <td><div class="fw7">${safeName}</div><div class="fs12 c-muted">${safeUnit}</div></td>
+      <td>${safeProp}</td>
+      <td class="fw7">${c} ${fmt(t.rentAmount)} / ${safeFreq}</td>
       <td class="fs12">${leaseTotalDisplay}</td>
       <td>${lastPay ? fmtD(lastPay.datePaid) : '<span class="c-muted">Never</span>'}</td>
       <td class="${balance>0?'c-bad':'c-ok'} fw7">${balance>0?'+':''}${c} ${fmt(Math.abs(balance))}</td>
@@ -1315,14 +1335,21 @@ function renderRem() {
   document.getElementById('rem-content').innerHTML =
     section('Overdue Rent','⚠','var(--bad)',overdue, t=>{
       const {balance, leaseTotal}=tenStatus(t);
-      return `<tr><td><div class="fw7">${t.name}</div><div class="fs12 c-muted">${t.phone}</div></td><td>${propName(t.propertyId)}</td><td class="c-bad fw7">${c} ${fmt(balance)} owed${leaseTotal?` <span class="fs12 c-muted">/ ${c} ${fmt(leaseTotal)} total lease</span>`:''}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal('${t.id}')">Record Payment</button></td></tr>`;
+      const safeName=escapeHtml(t.name);
+      const safePhone=escapeHtml(t.phone || '');
+      const safeProp=escapeHtml(propName(t.propertyId));
+      return `<tr><td><div class="fw7">${safeName}</div><div class="fs12 c-muted">${safePhone}</div></td><td>${safeProp}</td><td class="c-bad fw7">${c} ${fmt(balance)} owed${leaseTotal?` <span class="fs12 c-muted">/ ${c} ${fmt(leaseTotal)} total lease</span>`:''}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal('${t.id}')">Record Payment</button></td></tr>`;
     })+
-    section('Due Within 7 Days','🔔','var(--warn)',soon, t=>
-      `<tr><td class="fw7">${t.name}</td><td>${propName(t.propertyId)}</td><td>${c} ${fmt(t.rentAmount)} / ${t.rentFrequency}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal('${t.id}')">Record Payment</button></td></tr>`
-    )+
-    section('Leases Expiring Within 30 Days','📋','var(--navy)',expiring, t=>
-      `<tr><td class="fw7">${t.name}</td><td>${propName(t.propertyId)}</td><td>${fmtD(t.leaseEnd)} <span class="badge b-warn">${t.dLeft}d left</span></td><td><button class="btn btn-ghost btn-sm" onclick="openTenModal('${t.id}')">Update Lease</button></td></tr>`
-    );
+    section('Due Within 7 Days','🔔','var(--warn)',soon, t=>{
+      const safeName=escapeHtml(t.name);
+      const safeProp=escapeHtml(propName(t.propertyId));
+      return `<tr><td class="fw7">${safeName}</td><td>${safeProp}</td><td>${c} ${fmt(t.rentAmount)} / ${escapeHtml(t.rentFrequency)}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal('${t.id}')">Record Payment</button></td></tr>`;
+    })+
+    section('Leases Expiring Within 30 Days','📋','var(--navy)',expiring, t=>{
+      const safeName=escapeHtml(t.name);
+      const safeProp=escapeHtml(propName(t.propertyId));
+      return `<tr><td class="fw7">${safeName}</td><td>${safeProp}</td><td>${fmtD(t.leaseEnd)} <span class="badge b-warn">${t.dLeft}d left</span></td><td><button class="btn btn-ghost btn-sm" onclick="openTenModal('${t.id}')">Update Lease</button></td></tr>`;
+    });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1366,14 +1393,20 @@ function renderExp() {
     <div class="stat-card"><div class="stat-ic ic-red">📅</div><div><div class="stat-val">${c} ${fmt(mE.reduce((s,e)=>s+e.amount,0))}</div><div class="stat-lbl">This Month</div></div></div>
     <div class="stat-card"><div class="stat-ic ic-navy">📆</div><div><div class="stat-val">${c} ${fmt(yE.reduce((s,e)=>s+e.amount,0))}</div><div class="stat-lbl">This Year</div></div></div>
     <div class="stat-card"><div class="stat-ic ic-gold">🧾</div><div><div class="stat-val">${exps.length}</div><div class="stat-lbl">Total Records</div></div></div>`;
-  document.getElementById('exp-body').innerHTML = exps.length ? exps.map(e=>`
+  document.getElementById('exp-body').innerHTML = exps.length ? exps.map(e=>{
+    const safeType=escapeHtml(e.type);
+    const safeDesc=escapeHtml(e.description || '—');
+    const safeVendor=escapeHtml(e.vendor || '—');
+    const safeProp=escapeHtml(propName(e.propertyId));
+    return `
     <tr>
-      <td>${fmtD(e.date)}</td><td>${propName(e.propertyId)}</td>
-      <td><span class="badge b-blue">${e.type}</span></td>
-      <td>${e.description||'—'}</td><td>${e.vendor||'—'}</td>
+      <td>${fmtD(e.date)}</td><td>${safeProp}</td>
+      <td><span class="badge b-blue">${safeType}</span></td>
+      <td>${safeDesc}</td><td>${safeVendor}</td>
       <td class="fw7 c-bad">${c} ${fmt(e.amount)}</td>
       <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openExpModal('${e.id}')">✏</button><button class="btn btn-red btn-sm" onclick="delExp('${e.id}')">🗑</button></div></td>
-    </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">No expenses recorded yet.</td></tr>`;
+    </tr>`;
+  }).join('') : `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">No expenses recorded yet.</td></tr>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1419,17 +1452,25 @@ function renderMaint() {
   const c=cur();
   const priBdg=p=>p==='Emergency'?'b-red':p==='High'?'b-warn':p==='Medium'?'b-blue':'b-gray';
   const stBdg=s=>s==='Completed'?'b-green':s==='In Progress'?'b-warn':'b-gray';
-  document.getElementById('maint-body').innerHTML = list.length ? list.map(m=>`
+  document.getElementById('maint-body').innerHTML = list.length ? list.map(m=>{
+    const safeTitle=escapeHtml(m.title);
+    const safeDesc=escapeHtml(m.description ? (m.description.slice(0,55) + (m.description.length>55?'…':'')) : '');
+    const safeContractor=escapeHtml(m.contractor || '—');
+    const safeContractorPhone=escapeHtml(m.contractorPhone || '');
+    const safeProp=escapeHtml(propName(m.propertyId));
+    const safeUnit=escapeHtml(m.unit || '');
+    return `
     <tr>
       <td>${fmtD(m.dateReported)}</td>
-      <td>${propName(m.propertyId)} ${m.unit?'/ '+m.unit:''}</td>
-      <td><div class="fw7">${m.title}</div>${m.description?`<div class="fs12 c-muted">${m.description.slice(0,55)}${m.description.length>55?'…':''}</div>`:''}</td>
-      <td><span class="badge ${priBdg(m.priority)}">${m.priority}</span></td>
-      <td>${m.contractor||'—'}${m.contractorPhone?`<br><span class="fs12 c-muted">${m.contractorPhone}</span>`:''}</td>
+      <td>${safeProp} ${safeUnit ? '/ '+safeUnit : ''}</td>
+      <td><div class="fw7">${safeTitle}</div>${m.description?`<div class="fs12 c-muted">${safeDesc}</div>`:''}</td>
+      <td><span class="badge ${priBdg(m.priority)}">${escapeHtml(m.priority)}</span></td>
+      <td>${safeContractor}${safeContractorPhone?`<br><span class="fs12 c-muted">${safeContractorPhone}</span>`:''}</td>
       <td>${m.cost?`${c} ${fmt(m.cost)}`:'—'}</td>
-      <td><span class="badge ${stBdg(m.status)}">${m.status}</span></td>
+      <td><span class="badge ${stBdg(m.status)}">${escapeHtml(m.status)}</span></td>
       <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openMaintModal('${m.id}')">✏</button><button class="btn btn-red btn-sm" onclick="delMaint('${m.id}')">🗑</button></div></td>
-    </tr>`).join('') : `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">No jobs found.</td></tr>`;
+    </tr>`;
+  }).join('') : `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">No jobs found.</td></tr>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1969,19 +2010,23 @@ function delNote(id) {
 
 function renderNotes() {
   const notes=[...load(K.notes)].sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
-  const legalBtns=LEGAL_DOCS.map((d,i)=>`<button class="btn btn-ghost btn-sm" style="justify-content:flex-start;text-align:left" onclick="useLegal(${i})">${d.icon} ${d.title}</button>`).join('');
-  const tplBtns=TEMPLATES.map((t,i)=>`<button class="btn btn-ghost btn-sm" style="justify-content:flex-start;text-align:left" onclick="useTpl(${i})">${t.icon} ${t.title}</button>`).join('');
-  const savedHTML = notes.length ? `<div class="notes-grid">${notes.map(n=>`
+  const legalBtns=LEGAL_DOCS.map((d,i)=>`<button class="btn btn-ghost btn-sm" style="justify-content:flex-start;text-align:left" onclick="useLegal(${i})">${d.icon} ${escapeHtml(d.title)}</button>`).join('');
+  const tplBtns=TEMPLATES.map((t,i)=>`<button class="btn btn-ghost btn-sm" style="justify-content:flex-start;text-align:left" onclick="useTpl(${i})">${t.icon} ${escapeHtml(t.title)}</button>`).join('');
+  const savedHTML = notes.length ? `<div class="notes-grid">${notes.map(n=>{
+    const safeTitle=escapeHtml(n.title);
+    const safePreview=escapeHtml((n.body || '').slice(0,180) + ((n.body || '').length>180 ? '…' : ''));
+    return `
     <div class="note-card">
-      <h3>${n.title}</h3>
-      <div class="note-preview">${n.body.slice(0,180)}${n.body.length>180?'…':''}</div>
+      <h3>${safeTitle}</h3>
+      <div class="note-preview">${safePreview}</div>
       <div class="note-footer">
         <span class="fs12 c-muted">${fmtD(n.updatedAt)}</span>
         <button class="btn btn-ghost btn-sm ml-a" onclick="copyNote('${n.id}')">📋 Copy</button>
         <button class="btn btn-ghost btn-sm" onclick="openNoteModal('${n.id}')">✏</button>
         <button class="btn btn-red btn-sm" onclick="delNote('${n.id}')">🗑</button>
       </div>
-    </div>`).join('')}</div>`
+    </div>`;
+  }).join('')}</div>`
   : `<div class="empty"><div class="ei">📝</div><h3>No saved notes yet</h3><p>Use a template above to create your first document.</p></div>`;
 
   document.getElementById('notes-grid').innerHTML = `
@@ -2039,8 +2084,15 @@ function importBackup(input) {
   r.onload=e=>{
     try {
       const data=JSON.parse(e.target.result);
+      if(!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid backup structure');
+      const hasValidKey = Object.keys(K).some(k => Object.prototype.hasOwnProperty.call(data, k));
+      if(!hasValidKey) throw new Error('No valid PropManager backup data found');
       if(confirm('This will replace ALL current data. Are you sure?')){
-        Object.entries(K).forEach(([k,v])=>{ if(data[k]) save(v,data[k]) });
+        Object.values(K).forEach(v => localStorage.removeItem(v));
+        localStorage.removeItem('pm_demo_ok');
+        Object.entries(K).forEach(([k,v]) => {
+          if(Object.prototype.hasOwnProperty.call(data, k) && data[k] !== undefined) save(v, data[k]);
+        });
         toast('Backup restored successfully','ok'); renderDash();
       }
     } catch { toast('Invalid backup file','err') }
@@ -2079,7 +2131,15 @@ function loadDemo() {
   // Always refresh demo data dates to today — but never overwrite real (non-demo) data
   const existingTens = load(K.tens).filter(t => !t._demo);
   const existingProps = load(K.props).filter(p => !p._demo);
-  if (existingProps.length || existingTens.length) return; // User has real data — skip demo
+  const hasPersistedData = Object.values(K).some(key => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+      return Array.isArray(parsed) ? parsed.length > 0 : !!parsed;
+    } catch {
+      return false;
+    }
+  });
+  if (existingProps.length || existingTens.length || hasPersistedData) return; // User has real data — skip demo
   if (localStorage.getItem('pm_demo_ok')) {
     // Demo was loaded before — refresh dates to today without changing anything else
     const now = new Date();
@@ -2149,10 +2209,17 @@ function loadDemo() {
 // INIT
 // ═══════════════════════════════════════════════════════════
 (function init() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
   loadDemo();
   const s=loadO(K.sets);
   document.getElementById('biz-name-display').textContent=s.businessName||'Your Property Business';
-  if(s.dark){ document.body.classList.add('dark'); document.getElementById('s-dark').checked=true }
+  document.body.classList.toggle('dark', !!s.dark);
+  const darkToggle = document.getElementById('s-dark');
+  if (darkToggle) darkToggle.checked = !!s.dark;
   renderDash();
   // ── Resize: throttled with requestAnimationFrame to prevent jank ──
   let _resizeRaf;
