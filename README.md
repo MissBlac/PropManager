@@ -73,6 +73,12 @@ Open that URL in Chrome on your phone or computer.
 - Use **Settings → Data Backup & Restore** regularly. Backups include saved documents and can be large.
 - Browser storage can be cleared by the browser/device. A backup is the way to move or recover your data on another device.
 
+## Profiles and Appearance
+- Add an owner photo and contact details in **Settings**, plus an optional tenant photo on each tenant record.
+- Choose an optional app wallpaper and adjust its visibility; reset it any time to return to the default background.
+- Photos and wallpaper are compressed and stored offline in this browser. Backup/restore includes them with saved documents, so use a fresh backup to transfer them to another device.
+- Images and records remain device/browser-specific until you export and restore a backup. Clearing browser storage removes the local copies.
+
 ## Rent Schedules and Reminders
 - Rent schedules list each lease period, amount paid, and remaining balance.
 - Payments can be allocated to a selected period or automatically applied oldest-first.

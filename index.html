@@ -67,6 +67,8 @@ a,button{cursor:pointer}
 
 /* ── LAYOUT ── */
 .app{display:flex;min-height:100vh}
+.wallpaper-layer{position:fixed;inset:8px 0 0;z-index:0;pointer-events:none;background-position:center;background-size:cover;opacity:var(--wallpaper-opacity,.2)}
+.app{position:relative;z-index:1}
 .sidebar{
   width:var(--nav-w);
   background:linear-gradient(180deg,#0e1a36 0%,#1a2744 40%,#1e2f52 100%);
@@ -100,6 +102,8 @@ a,button{cursor:pointer}
 .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
 .nav-item.active{background:rgba(240,165,0,.13);color:var(--gold);border-left-color:var(--gold)}
 .nav-icon{font-size:16px;width:20px;text-align:center}
+.profile-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;flex:none;background:rgba(240,165,0,.16);border:2px solid rgba(240,165,0,.5)}
+.tenant-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:none;background:var(--bg);border:1px solid var(--border)}
 .nav-badge{background:var(--bad);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:auto;font-weight:700}
 .sidebar-bottom{
   margin-top:auto;padding:14px 18px;
@@ -300,12 +304,14 @@ body.dark .ps-item{background:var(--bg)}
 </head>
 <body>
 <div class="kente-strip"></div>
+<div class="wallpaper-layer" id="wallpaper-layer" aria-hidden="true"></div>
 <div class="app">
 
 <!-- ═══════════════════════════ SIDEBAR ═══════════════════════════ -->
 <nav class="sidebar" id="sidebar">
   <div class="logo">
     <div class="logo-kente"></div>
+    <img id="sidebar-owner-photo" class="profile-avatar" alt="" style="display:none;margin-bottom:8px">
     <h1>🏘 PropManager</h1>
     <p id="biz-name-display">Your Property Business</p>
     <div class="logo-flag">🇬🇭 Made for Ghana</div>
@@ -469,10 +475,19 @@ body.dark .ps-item{background:var(--bg)}
 <!-- ── SETTINGS ── -->
 <section class="section" id="section-settings">
   <div class="ph"><div class="ph-left"><h2>Settings</h2></div></div>
-  <div style="max-width:560px;display:flex;flex-direction:column;gap:16px">
+  <div style="max-width:720px;display:flex;flex-direction:column;gap:16px">
     <div class="card">
       <div class="card-title">Business Profile</div>
+      <div class="row" style="margin-bottom:14px">
+        <img id="owner-photo-preview" class="profile-avatar" alt="Owner profile preview" style="width:64px;height:64px">
+        <label class="btn btn-ghost" style="cursor:pointer">Choose owner photo<input type="file" id="s-owner-photo" accept="image/*" style="display:none" onchange="previewSelectedImage(this,'owner-photo-preview')"></label>
+        <button class="btn btn-ghost btn-sm" onclick="removeOwnerPhoto()">Remove photo</button>
+      </div>
       <div class="fg"><label>Business / Landlord Name</label><input type="text" id="s-biz" placeholder="e.g. Mensah Properties Ltd"></div>
+      <div class="form-grid">
+        <div class="fg"><label>Email</label><input type="email" id="s-email" placeholder="name@example.com"></div>
+        <div class="fg"><label>Business / Mailing Address</label><input type="text" id="s-address" placeholder="Optional"></div>
+      </div>
       <div class="fg"><label>Currency Symbol</label><input type="text" id="s-cur" placeholder="GHS" style="width:100px"></div>
       <div class="fg"><label>Phone / WhatsApp</label><input type="text" id="s-phone" placeholder="+233..."></div>
       <button class="btn btn-gold mt8" onclick="saveSettings()">Save Settings</button>
@@ -480,6 +495,8 @@ body.dark .ps-item{background:var(--bg)}
     <div class="card">
       <div class="card-title">Appearance</div>
       <div class="toggle-wrap"><span>Dark Mode</span><label class="tog"><input type="checkbox" id="s-dark" onchange="toggleDark(this)"><span class="tog-sl"></span></label></div>
+      <div class="fg" style="margin-top:14px"><label>App wallpaper image</label><div class="row" style="flex-wrap:wrap"><label class="btn btn-ghost" style="cursor:pointer">Choose wallpaper<input type="file" id="s-wallpaper" accept="image/*" style="display:none" onchange="saveWallpaper(this)"></label><button class="btn btn-ghost btn-sm" onclick="removeWallpaper()">Restore default</button></div></div>
+      <div class="fg"><label for="s-wallpaper-opacity">Wallpaper visibility</label><input type="range" id="s-wallpaper-opacity" min="5" max="40" value="18" oninput="setWallpaperOpacity(this.value)" onchange="saveWallpaperOpacity(this.value)"><small class="c-muted">Lower visibility keeps text readable. Wallpapers are stored only in this browser.</small></div>
     </div>
     <div class="card">
       <div class="card-title">Data Backup & Restore</div>
@@ -534,6 +551,11 @@ body.dark .ps-item{background:var(--bg)}
     <div class="modal-body">
       <input type="hidden" id="t-id">
       <div class="form-sec">Personal Details</div>
+      <div class="row" style="margin-bottom:14px">
+        <img id="t-photo-preview" class="tenant-avatar" alt="Tenant photo preview" style="width:64px;height:64px">
+        <label class="btn btn-ghost" style="cursor:pointer">Choose tenant photo<input type="file" id="t-photo" accept="image/*" style="display:none" onchange="previewSelectedImage(this,'t-photo-preview')"></label>
+        <button class="btn btn-ghost btn-sm" onclick="removeTenantPhoto()">Remove photo</button>
+      </div>
       <div class="form-grid">
         <div class="fg"><label>Full Name *</label><input type="text" id="t-name" placeholder="Legal name"></div>
         <div class="fg"><label>Phone *</label><input type="tel" id="t-phone" placeholder="+233…"></div>
@@ -733,6 +755,7 @@ function documentTransaction(mode,action) {
 }
 const saveDocumentRecord=record=>documentTransaction('readwrite',store=>store.put(record));
 const deleteDocumentRecord=id=>documentTransaction('readwrite',store=>store.delete(id));
+const getDocumentRecord=id=>documentTransaction('readonly',store=>store.get(id));
 const allDocumentRecords=()=>documentTransaction('readonly',store=>store.getAll()).then(records=>records||[]);
 function replaceDocumentRecords(records) {
   return documentDb().then(db=>new Promise((resolve,reject)=>{
@@ -750,6 +773,36 @@ const readFileAsDataUrl=blob=>new Promise((resolve,reject)=>{
   reader.onerror=()=>reject(reader.error||new Error('Could not read document for backup'));
   reader.readAsDataURL(blob);
 });
+async function prepareImage(file,maxDimension=512,maxBytes=350*1024) {
+  if(!file||!file.type.startsWith('image/')) throw new Error('Choose an image file');
+  if(file.size>12*1024*1024) throw new Error('Choose an image smaller than 12 MB');
+  let bitmap;
+  try { bitmap=await createImageBitmap(file) }
+  catch(error){throw new Error('Could not read this image. Choose a JPEG, PNG, WebP or supported photo.')}
+  try {
+    const scale=Math.min(1,maxDimension/Math.max(bitmap.width,bitmap.height));
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+    canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+    for(const quality of [.84,.72,.6,.48]) {
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',quality));
+      if(blob&&blob.size<=maxBytes)return blob;
+    }
+    throw new Error('This image could not be compressed small enough. Choose a smaller image.');
+  } finally { bitmap.close?.() }
+}
+const objectUrls=new Map();
+async function storedObjectUrl(id) {
+  if(!id)return '';
+  if(objectUrls.has(id))return objectUrls.get(id);
+  const record=await getDocumentRecord(id);
+  if(!record?.blob) return '';
+  const url=URL.createObjectURL(record.blob);objectUrls.set(id,url);return url;
+}
+function releaseObjectUrl(id) {
+  const url=objectUrls.get(id);
+  if(url){URL.revokeObjectURL(url);objectUrls.delete(id)}
+}
 function dataUrlToBlob(dataUrl) {
   const match=/^data:([^;,]+);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
   if(!match) throw new Error('Backup contains an invalid document attachment');
@@ -1066,8 +1119,13 @@ let _origLeaseEnd = '';
 let _origFreq = '';
 
 function openTenModal(id) {
+  const photoPreview=document.getElementById('t-photo-preview');
+  if(photoPreview.dataset.previewUrl){URL.revokeObjectURL(photoPreview.dataset.previewUrl);delete photoPreview.dataset.previewUrl}
   ['t-id','t-name','t-phone','t-email','t-gid','t-ecname','t-ecphone','t-unit','t-rent','t-start','t-end','t-dep','t-notes'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('t-dur').value='';
+  document.getElementById('t-photo').value='';
+  document.getElementById('t-photo').dataset.remove='';
+  photoPreview.removeAttribute('src');
   document.getElementById('t-freq').value='Monthly'; document.getElementById('t-status').value='Active';
   document.getElementById('t-rate-effective-wrap').style.display='none';
   document.getElementById('t-rate-effective').value=today();
@@ -1090,6 +1148,7 @@ function openTenModal(id) {
     document.getElementById('t-freq').value=t.rentFrequency; document.getElementById('t-start').value=t.leaseStart||'';
     document.getElementById('t-end').value=t.leaseEnd||''; document.getElementById('t-dep').value=t.deposit||'';
     document.getElementById('t-status').value=t.status; document.getElementById('t-notes').value=t.notes||'';
+    if(t.photoId) storedObjectUrl(t.photoId).then(url=>{if(url&&document.getElementById('t-id').value===id)document.getElementById('t-photo-preview').src=url}).catch(error=>{console.error('Could not load tenant photo',error);toast('Could not load the saved tenant photo','err')});
     document.getElementById('m-ten-title').textContent='Edit Tenant';
   }
   openMod('m-ten');
@@ -1113,7 +1172,7 @@ function clearDur() {
   document.getElementById('t-dur').value = '';
 }
 
-function saveTen() {
+async function saveTen() {
   const name=document.getElementById('t-name').value.trim();
   const phone=document.getElementById('t-phone').value.trim();
   const rent=document.getElementById('t-rent').value;
@@ -1126,6 +1185,16 @@ function saveTen() {
   const newRent=Number(rent);
   const newFreq=document.getElementById('t-freq').value;
   const previous=arr.find(x=>x.id===id);
+  const photoInput=document.getElementById('t-photo');
+  let photoId=photoInput.dataset.remove?null:(previous?.photoId||null);
+  let photoRecord=null;
+  if(photoInput.files[0]) {
+    try {
+      const blob=await prepareImage(photoInput.files[0]);
+      photoRecord={id:uid(),tenantId:id||'pending',name:`${name} profile photo.jpg`,mimeType:'image/jpeg',kind:'tenant-photo',createdAt:new Date().toISOString(),blob};
+      photoId=photoRecord.id;
+    } catch(error){console.error('Could not prepare tenant photo',error);toast(error.message||'Could not save tenant photo offline','err');return}
+  }
   const rateEffective=document.getElementById('t-rate-effective').value||today();
   const existingRate=previous?.rentHistory?.find(rate=>rate.effectiveDate===rateEffective);
   const rateChanged=!!previous&&(
@@ -1155,6 +1224,7 @@ function saveTen() {
     propertyId:prop, unit:document.getElementById('t-unit').value,
     rentAmount:currentRent, rentFrequency:currentFrequency,
     rentHistory,
+    photoId,
     leaseStart:start, leaseEnd:newEnd,
     deposit:document.getElementById('t-dep').value,
     status:document.getElementById('t-status').value,
@@ -1163,7 +1233,20 @@ function saveTen() {
   };
 
   if(id){ const i=arr.findIndex(x=>x.id===id); arr[i]=ob } else arr.push(ob);
-  save(K.tens,arr);
+  if(photoRecord) {
+    photoRecord.tenantId=ob.id;
+    try {await saveDocumentRecord(photoRecord)}
+    catch(error){console.error('Could not save tenant photo',error);toast('Could not save the tenant photo offline','err');return}
+  }
+  try { save(K.tens,arr) }
+  catch(error){if(photoRecord){releaseObjectUrl(photoRecord.id);await deleteDocumentRecord(photoRecord.id)}throw error}
+  if(previous?.photoId&&previous.photoId!==photoId) {
+    releaseObjectUrl(previous.photoId);
+    try {await deleteDocumentRecord(previous.photoId)}
+    catch(error){console.error('Could not remove replaced tenant photo',error);toast('Tenant was saved, but the previous photo could not be removed','warn')}
+  }
+  const tenantPhotoPreview=document.getElementById('t-photo-preview');
+  if(tenantPhotoPreview.dataset.previewUrl){URL.revokeObjectURL(tenantPhotoPreview.dataset.previewUrl);delete tenantPhotoPreview.dataset.previewUrl}
   closeMod('m-ten');
   renderTenants();renderDash();renderRent();renderRem();
   if(document.getElementById('section-reports').classList.contains('active'))renderReports();
@@ -1186,6 +1269,30 @@ function saveTen() {
   } else {
     toast('Tenant saved','ok');
   }
+}
+
+function previewSelectedImage(input,previewId) {
+  const file=input.files?.[0];
+  if(!file)return;
+  const preview=document.getElementById(previewId);
+  if(!file.type.startsWith('image/')||file.size>12*1024*1024){
+    input.value='';toast('Choose an image smaller than 12 MB','err');
+    if(preview.dataset.previewUrl){URL.revokeObjectURL(preview.dataset.previewUrl);delete preview.dataset.previewUrl}
+    if(input.id==='s-owner-photo')loadSettings();else preview.removeAttribute('src');
+    return;
+  }
+  const url=URL.createObjectURL(file);
+  const previous=preview.dataset.previewUrl;
+  if(previous)URL.revokeObjectURL(previous);
+  preview.dataset.previewUrl=url;preview.src=url;
+  if(input.id==='t-photo')input.dataset.remove='';
+}
+
+function removeTenantPhoto() {
+  const input=document.getElementById('t-photo'),preview=document.getElementById('t-photo-preview');
+  input.value='';input.dataset.remove='1';
+  if(preview.dataset.previewUrl){URL.revokeObjectURL(preview.dataset.previewUrl);delete preview.dataset.previewUrl}
+  preview.removeAttribute('src');
 }
 
 function genRentIncreaseNotice(tenant, oldRent, effectiveDate=today()) {
@@ -1275,10 +1382,16 @@ ${todayStr}`;
   openMod('m-note');
 }
 
-function delTen(id) {
+async function delTen(id) {
   if(!confirm('Delete this tenant?')) return;
+  const tenant=load(K.tens).find(item=>item.id===id);
   save(K.tens, load(K.tens).filter(t=>t.id!==id));renderTenants();renderDash();renderRent();renderRem();
   if(document.getElementById('section-reports').classList.contains('active'))renderReports();
+  if(tenant?.photoId) {
+    releaseObjectUrl(tenant.photoId);
+    try {await deleteDocumentRecord(tenant.photoId)}
+    catch(error){console.error('Could not remove deleted tenant photo',error);toast('Tenant removed, but the profile photo could not be removed from offline storage','warn');return}
+  }
   toast('Tenant removed','warn');
 }
 
@@ -1298,9 +1411,10 @@ function renderTenants() {
     const safePhone=escapeHtml(t.phone || '');
     const safeProp=escapeHtml(propName(t.propertyId));
     const safeUnit=escapeHtml(t.unit || '');
+    const avatar=t.photoId?`<img class="tenant-avatar" data-photo-id="${escapeHtml(t.photoId)}" alt="">`:`<span class="tenant-avatar" style="display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted)">${escapeHtml((t.name||'?').trim().slice(0,1).toUpperCase())}</span>`;
     return `
     <tr>
-      <td><div class="fw7">${safeName}</div><div class="fs12 c-muted">${safePhone}</div></td>
+      <td><div class="row">${avatar}<div><div class="fw7">${safeName}</div><div class="fs12 c-muted">${safePhone}</div></div></div></td>
       <td>${safeProp} <span class="c-muted">${safeUnit ? '/ '+safeUnit : ''}</span></td>
       <td class="fw7">${c} ${fmt(t.rentAmount)}</td>
       <td>${escapeHtml(t.rentFrequency)}</td>
@@ -1311,6 +1425,16 @@ function renderTenants() {
       <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openTenModal(${inlineArg(t.id)})">✏</button><button class="btn btn-red btn-sm" onclick="delTen(${inlineArg(t.id)})">🗑</button></div></td>
     </tr>`;
   }).join('') : `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">No tenants found.</td></tr>`;
+  hydrateTenantPhotos().catch(error=>{console.error('Could not load tenant photos',error);toast('Could not load tenant photos from offline storage','err')});
+}
+
+async function hydrateTenantPhotos() {
+  const images=[...document.querySelectorAll('#ten-body img[data-photo-id]')];
+  await Promise.all(images.map(async image=>{
+    const url=await storedObjectUrl(image.dataset.photoId);
+    if(url&&image.isConnected)image.src=url;
+    else if(image.isConnected)image.replaceWith(Object.assign(document.createElement('span'),{className:'tenant-avatar',textContent:'?'}));
+  }));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1439,6 +1563,8 @@ function receiptHTML(pay, tenant, prop, s, single=true) {
   const c=escapeHtml(s.currency||'GHS');
   const biz=escapeHtml(s.businessName||'Property Manager');
   const phone=escapeHtml(s.phone||'');
+  const email=escapeHtml(s.email||'');
+  const address=escapeHtml(s.address||'');
   const rno=escapeHtml(pay.receiptNo||('RCT-'+pay.id.slice(0,8).toUpperCase()));
   const tenantName=escapeHtml(tenant?.name || '—');
   const tenantPhone=escapeHtml(tenant?.phone || '—');
@@ -1455,6 +1581,8 @@ function receiptHTML(pay, tenant, prop, s, single=true) {
         <div>
           <div style="font-size:18px;font-weight:700;color:#1a2744">🏘 ${biz}</div>
           <div style="font-size:12px;color:#718096;margin-top:3px">${phone}</div>
+          ${email?`<div style="font-size:12px;color:#718096">${email}</div>`:''}
+          ${address?`<div style="font-size:12px;color:#718096">${address}</div>`:''}
         </div>
         <div style="text-align:right">
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#718096;font-weight:700">Official Rent Receipt</div>
@@ -2304,7 +2432,7 @@ function agreementTextFor(tenant) {
   const settings=loadO(K.sets), property=load(K.props).find(item=>item.id===tenant.propertyId);
   const period=rentPeriods(tenant);
   const total=period.reduce((sum,item)=>sum+item.amount,0);
-  return `${settings.businessName||'Landlord'} and ${tenant.name} agree to the following tenancy terms.\n\nPROPERTY\n${property?.name||'—'}${tenant.unit?` / ${tenant.unit}`:''}\n${property?.address||''}\n\nLEASE TERM\nStart: ${fmtD(tenant.leaseStart)}\nEnd: ${fmtD(tenant.leaseEnd)}\n\nRENT\nCurrent rent: ${cur()} ${fmt(tenant.rentAmount)} ${tenant.rentFrequency.toLowerCase()}\nScheduled lease value based on recorded rent changes: ${cur()} ${fmt(total)}\nSecurity deposit: ${cur()} ${fmt(tenant.deposit||0)}\n\nTENANT\n${tenant.name}\nPhone: ${tenant.phone||'—'}\nEmail: ${tenant.email||'—'}\n\nSPECIAL CONDITIONS\n${tenant.notes||'None recorded.'}\n\nThe parties confirm that they have read and accepted these terms. Each party should retain a copy of the signed agreement.\n\nLandlord: ${settings.businessName||'________________________'}\nTenant: ${tenant.name}\nDate signed: ${fmtD(today())}`;
+  return `${settings.businessName||'Landlord'} and ${tenant.name} agree to the following tenancy terms.\n\nLANDLORD\n${settings.businessName||'—'}\nPhone: ${settings.phone||'—'}\nEmail: ${settings.email||'—'}\nAddress: ${settings.address||'—'}\n\nPROPERTY\n${property?.name||'—'}${tenant.unit?` / ${tenant.unit}`:''}\n${property?.address||''}\n\nLEASE TERM\nStart: ${fmtD(tenant.leaseStart)}\nEnd: ${fmtD(tenant.leaseEnd)}\n\nRENT\nCurrent rent: ${cur()} ${fmt(tenant.rentAmount)} ${tenant.rentFrequency.toLowerCase()}\nScheduled lease value based on recorded rent changes: ${cur()} ${fmt(total)}\nSecurity deposit: ${cur()} ${fmt(tenant.deposit||0)}\n\nTENANT\n${tenant.name}\nPhone: ${tenant.phone||'—'}\nEmail: ${tenant.email||'—'}\n\nSPECIAL CONDITIONS\n${tenant.notes||'None recorded.'}\n\nThe parties confirm that they have read and accepted these terms. Each party should retain a copy of the signed agreement.\n\nLandlord: ${settings.businessName||'________________________'}\nTenant: ${tenant.name}\nDate signed: ${fmtD(today())}`;
 }
 
 function fillDocumentTenantSelects() {
@@ -2395,7 +2523,7 @@ async function deleteStoredDocument(id) {
 async function refreshAgreementsList() {
   const container=document.getElementById('agreements-list');
   try {
-    const documents=await allDocumentRecords(),tenants=load(K.tens);
+    const documents=(await allDocumentRecords()).filter(record=>['signed-agreement','imported-signed-document'].includes(record.kind)),tenants=load(K.tens);
     container.innerHTML=documents.length?`<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Document</th><th>Saved</th><th>Actions</th></tr></thead><tbody>${documents.map(record=>{
       const tenant=tenants.find(item=>item.id===record.tenantId);
       return `<tr><td>${escapeHtml(tenant?.name||'Tenant removed')}</td><td>${escapeHtml(record.name)}</td><td>${escapeHtml(fmtD(record.createdAt))}</td><td><div class="row"><button class="btn btn-ghost btn-sm" onclick="downloadStoredDocument(${inlineArg(record.id)})">Download</button><button class="btn btn-ghost btn-sm" onclick="shareStoredDocument(${inlineArg(record.id)})">Share</button><button class="btn btn-red btn-sm" onclick="deleteStoredDocument(${inlineArg(record.id)})">Delete</button></div></td></tr>`;
@@ -2446,22 +2574,107 @@ function renderNotes() {
 // ═══════════════════════════════════════════════════════════
 // SETTINGS
 // ═══════════════════════════════════════════════════════════
-function loadSettings() {
+async function loadSettings() {
   const s=loadO(K.sets);
   document.getElementById('s-biz').value=s.businessName||''; document.getElementById('s-cur').value=s.currency||'GHS';
-  document.getElementById('s-phone').value=s.phone||''; document.getElementById('s-dark').checked=s.dark||false;
+  document.getElementById('s-phone').value=s.phone||'';
+  document.getElementById('s-email').value=s.email||'';
+  document.getElementById('s-address').value=s.address||'';
+  document.getElementById('s-dark').checked=s.dark||false;
+  document.getElementById('s-wallpaper-opacity').value=Math.round((s.wallpaperOpacity??.18)*100);
+  applyWallpaper(s).catch(error=>{console.error('Could not load saved wallpaper',error);toast('Could not load the saved wallpaper','err')});
+  try {
+    const url=await storedObjectUrl(s.ownerPhotoId);
+    const preview=document.getElementById('owner-photo-preview'),sidebar=document.getElementById('sidebar-owner-photo');
+    preview.src=url;preview.style.display=url?'block':'none';
+    sidebar.src=url;sidebar.style.display=url?'block':'none';
+  } catch(error){console.error('Could not load owner photo',error);toast('Could not load the owner profile photo','err')}
 }
 
-function saveSettings() {
-  const s={ businessName:document.getElementById('s-biz').value, currency:document.getElementById('s-cur').value||'GHS', phone:document.getElementById('s-phone').value, dark:document.getElementById('s-dark').checked };
-  save(K.sets,s);
+async function saveSettings() {
+  const previous=loadO(K.sets);
+  const s={...previous,businessName:document.getElementById('s-biz').value.trim(),currency:document.getElementById('s-cur').value.trim()||'GHS',phone:document.getElementById('s-phone').value.trim(),email:document.getElementById('s-email').value.trim(),address:document.getElementById('s-address').value.trim(),dark:document.getElementById('s-dark').checked};
+  const photoInput=document.getElementById('s-owner-photo');
+  if(photoInput.files[0]) {
+    try {
+      const blob=await prepareImage(photoInput.files[0]);
+      const record={id:uid(),tenantId:'owner',name:'Owner profile photo.jpg',mimeType:'image/jpeg',kind:'owner-photo',createdAt:new Date().toISOString(),blob};
+      await saveDocumentRecord(record);s.ownerPhotoId=record.id;
+    } catch(error){console.error('Could not save owner photo',error);toast(error.message||'Could not save owner photo offline','err');return}
+  }
+  try { save(K.sets,s) }
+  catch(error){if(s.ownerPhotoId!==previous.ownerPhotoId)await deleteDocumentRecord(s.ownerPhotoId);throw error}
+  if(previous.ownerPhotoId&&previous.ownerPhotoId!==s.ownerPhotoId){releaseObjectUrl(previous.ownerPhotoId);await deleteDocumentRecord(previous.ownerPhotoId)}
+  const preview=document.getElementById('owner-photo-preview');
+  if(preview.dataset.previewUrl){URL.revokeObjectURL(preview.dataset.previewUrl);delete preview.dataset.previewUrl}
+  photoInput.value='';
   document.getElementById('biz-name-display').textContent=s.businessName||'Your Property Business';
-  toast('Settings saved','ok');
+  await loadSettings();
+  renderDash();
+  toast('Business profile saved','ok');
 }
 
 function toggleDark(el) {
   document.body.classList.toggle('dark',el.checked);
   const s=loadO(K.sets); s.dark=el.checked; save(K.sets,s);
+}
+
+async function applyWallpaper(settings=loadO(K.sets)) {
+  const layer=document.getElementById('wallpaper-layer');
+  const opacity=Math.min(.4,Math.max(.05,Number(settings.wallpaperOpacity??.18)));
+  document.body.style.setProperty('--wallpaper-opacity',String(opacity));
+  const url=await storedObjectUrl(settings.wallpaperId);
+  layer.style.backgroundImage=url?`url("${url}")`:'none';
+}
+
+async function saveWallpaper(input) {
+  const file=input.files?.[0];if(!file)return;
+  const previous=loadO(K.sets);
+  try {
+    const blob=await prepareImage(file,1600,2*1024*1024);
+    const record={id:uid(),tenantId:'owner',name:'App wallpaper.jpg',mimeType:'image/jpeg',kind:'wallpaper',createdAt:new Date().toISOString(),blob};
+    await saveDocumentRecord(record);
+    const settings={...previous,wallpaperId:record.id};
+    try { save(K.sets,settings) }
+    catch(error){await deleteDocumentRecord(record.id);throw error}
+    if(previous.wallpaperId){releaseObjectUrl(previous.wallpaperId);await deleteDocumentRecord(previous.wallpaperId)}
+    await applyWallpaper(settings);
+    toast('Wallpaper saved for offline use','ok');
+  } catch(error){console.error('Could not save wallpaper',error);toast(error.message||'Could not save wallpaper offline','err')}
+  finally {input.value=''}
+}
+
+async function removeWallpaper() {
+  const settings=loadO(K.sets),wallpaperId=settings.wallpaperId;
+  delete settings.wallpaperId;
+  try {
+    save(K.sets,settings);
+    if(wallpaperId){releaseObjectUrl(wallpaperId);await deleteDocumentRecord(wallpaperId)}
+    await applyWallpaper(settings);
+    toast('Default background restored','ok');
+  } catch(error){console.error('Could not restore default background',error);toast('Could not restore the default background','err')}
+}
+
+function setWallpaperOpacity(value) {
+  document.body.style.setProperty('--wallpaper-opacity',String(Math.min(.4,Math.max(.05,Number(value)/100))));
+}
+function saveWallpaperOpacity(value) {
+  const settings=loadO(K.sets);settings.wallpaperOpacity=Math.min(.4,Math.max(.05,Number(value)/100));
+  save(K.sets,settings);setWallpaperOpacity(value);
+}
+
+async function removeOwnerPhoto() {
+  const settings=loadO(K.sets),photoId=settings.ownerPhotoId;
+  delete settings.ownerPhotoId;
+  try {
+    save(K.sets,settings);
+    if(photoId){releaseObjectUrl(photoId);await deleteDocumentRecord(photoId)}
+    const input=document.getElementById('s-owner-photo'),preview=document.getElementById('owner-photo-preview');
+    input.value='';
+    if(preview.dataset.previewUrl){URL.revokeObjectURL(preview.dataset.previewUrl);delete preview.dataset.previewUrl}
+    await loadSettings();
+    toast('Owner photo removed','warn');
+  } catch(error){console.error('Could not remove owner photo',error);toast('Could not remove the owner photo','err')}
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2509,6 +2722,7 @@ function isValidBackup(data) {
       if(schema.numbers?.some(field=>typeof record[field]!=='number' || !Number.isFinite(record[field]) || record[field]<=0)) return false;
       if(schema.dates?.some(field=>!parseLocalDate(record[field]))) return false;
       if(key==='tens' && record.leaseEnd && !parseLocalDate(record.leaseEnd)) return false;
+      if(key==='tens' && record.photoId!==undefined && record.photoId!==null && typeof record.photoId!=='string') return false;
       if(key==='tens' && record.rentHistory!==undefined && (!Array.isArray(record.rentHistory)||record.rentHistory.some(rate=>
         !rate||typeof rate!=='object'||!parseLocalDate(rate.effectiveDate)||typeof rate.rentFrequency!=='string'||
         !['Monthly','Quarterly','Annually'].includes(rate.rentFrequency)||!Number.isFinite(Number(rate.rentAmount))||Number(rate.rentAmount)<=0
@@ -2519,8 +2733,9 @@ function isValidBackup(data) {
   if(Object.prototype.hasOwnProperty.call(data,'sets')) {
     const sets=data.sets;
     if(!sets || typeof sets!=='object' || Array.isArray(sets)) return false;
-    if(['businessName','currency','phone'].some(field=>sets[field]!==undefined && typeof sets[field]!=='string')) return false;
+    if(['businessName','currency','phone','email','address','ownerPhotoId','wallpaperId'].some(field=>sets[field]!==undefined && typeof sets[field]!=='string')) return false;
     if(sets.dark!==undefined && typeof sets.dark!=='boolean') return false;
+    if(sets.wallpaperOpacity!==undefined&&(!Number.isFinite(sets.wallpaperOpacity)||sets.wallpaperOpacity<.05||sets.wallpaperOpacity>.4))return false;
   }
   if(Object.prototype.hasOwnProperty.call(data,'documents')) {
     if(!Array.isArray(data.documents))return false;
@@ -2583,7 +2798,13 @@ function importBackup(input) {
       return;
     }
     toast(Array.isArray(data.documents)?'Backup and saved documents restored successfully':'Backup restored; existing saved documents were kept','ok');
+    objectUrls.forEach(url=>URL.revokeObjectURL(url));objectUrls.clear();
+    const restoredSettings=loadO(K.sets);
+    document.getElementById('biz-name-display').textContent=restoredSettings.businessName||'Your Property Business';
+    document.body.classList.toggle('dark',!!restoredSettings.dark);
+    await loadSettings();
     renderDash();
+    renderTenants();
     const activeSection=document.querySelector('.section.active')?.id.replace('section-','');
     if(activeSection && activeSection!=='dashboard' && renders[activeSection]) renders[activeSection]();
   };
@@ -2618,7 +2839,10 @@ async function clearDemo() {
   const demoTenantIds=new Set(load(K.tens).filter(tenant=>tenant._demo).map(tenant=>tenant.id));
   try {
     const documents=await allDocumentRecords();
-    await replaceDocumentRecords(documents.filter(record=>!demoTenantIds.has(record.tenantId)));
+    const keep=documents.filter(record=>!demoTenantIds.has(record.tenantId));
+    const keepIds=new Set(keep.map(record=>record.id));
+    documents.filter(record=>!keepIds.has(record.id)).forEach(record=>releaseObjectUrl(record.id));
+    await replaceDocumentRecords(keep);
   } catch(error){console.error('Could not remove demo documents',error);toast('Demo data was not removed because saved documents could not be updated','err');return}
   Object.entries(K).filter(([key])=>key!=='sets').forEach(([,v])=>{ const arr=load(v); save(v,arr.filter(x=>!x._demo)) });
   toast('Demo data removed','warn'); renderDash();renderNotes();
@@ -2629,6 +2853,7 @@ async function clearAll() {
   if(!confirm('Final confirmation — all records will be permanently lost.')) return;
   try { await replaceDocumentRecords([]) }
   catch(error){console.error('Could not clear offline documents',error);toast('Data was not cleared because saved documents could not be removed','err');return}
+  objectUrls.forEach(url=>URL.revokeObjectURL(url));objectUrls.clear();
   Object.values(K).forEach(v=>localStorage.removeItem(v));
   storageErrors.clear();
   localStorage.removeItem('pm_demo_ok'); toast('All data cleared','warn'); renderDash();
@@ -2730,6 +2955,7 @@ function loadDemo() {
   loadDemo();
   const s=loadO(K.sets);
   document.getElementById('biz-name-display').textContent=s.businessName||'Your Property Business';
+  loadSettings();
   document.body.classList.toggle('dark', !!s.dark);
   const darkToggle = document.getElementById('s-dark');
   if (darkToggle) darkToggle.checked = !!s.dark;
