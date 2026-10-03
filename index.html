@@ -214,6 +214,28 @@ tr:hover td{background:rgba(0,0,0,.015)}
 .tour-footer .btn:disabled{opacity:.45;cursor:default}
 .tour-next-icon{font-size:15px;line-height:1}
 @keyframes tour-step-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.dash-tools{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;margin:0 0 20px}
+.setup-list{display:flex;flex-direction:column;gap:9px}
+.setup-item{display:flex;align-items:center;gap:9px;font-size:12px}
+.setup-check{display:grid;place-items:center;width:22px;height:22px;flex:none;border-radius:50%;background:rgba(56,161,105,.13);color:var(--ok);font-weight:800}
+.setup-action{margin-left:auto}
+.backup-status{font-size:12px;line-height:1.5;color:var(--muted);margin:0 0 12px}
+.backup-card.needs-backup{border-left:4px solid var(--warn)}
+.quick-search-modal{max-width:620px}
+.quick-search-field{position:sticky;top:0;background:#fff;padding:16px 20px;border-bottom:1px solid var(--border);z-index:1}
+.quick-search-field input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:9px;font:inherit;font-size:14px}
+.quick-search-field input:focus{outline:2px solid rgba(240,165,0,.4);border-color:var(--gold)}
+.quick-search-results{padding:14px 20px;max-height:60vh;overflow:auto}
+.quick-search-result{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;text-align:left;background:transparent;border:0;border-radius:9px;color:var(--text);font:inherit;cursor:pointer}
+.quick-search-result:hover,.quick-search-result:focus{outline:none;background:var(--bg)}
+.quick-search-icon{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:10px;background:rgba(240,165,0,.12);font-size:17px}
+.quick-search-copy{min-width:0;flex:1}
+.quick-search-title{display:block;font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quick-search-subtitle{display:block;margin-top:3px;color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quick-search-type{color:var(--muted);font-size:10px;white-space:nowrap}
+body.dark .quick-search-field{background:var(--card)}
+body.dark .quick-search-field input{background:var(--bg);color:var(--text);border-color:var(--border)}
+body.dark .quick-search-result:hover,body.dark .quick-search-result:focus{background:var(--bg)}
 body.dark .tour-title{color:var(--text)}
 body.dark .tour-tip{background:rgba(56,161,105,.09);border-color:rgba(56,161,105,.2)}
 body.dark .tour-tip strong{color:var(--text)}
@@ -344,6 +366,7 @@ body.dark .ps-item{background:var(--bg)}
   .form-grid{grid-template-columns:1fr}
   .ph{flex-direction:column;align-items:flex-start}
   .dash-grid{grid-template-columns:1fr}
+  .dash-tools{grid-template-columns:1fr}
   .rep-charts{grid-template-columns:1fr!important}
   #section-reports{overflow-x:clip}
   #section-reports>.card:last-child{min-width:0;overflow:hidden}
@@ -398,6 +421,7 @@ body.dark .ps-item{background:var(--bg)}
     <div class="logo-flag">🇬🇭 Made for Ghana</div>
   </div>
   <div class="nav-label">Main</div>
+  <button class="nav-item" id="global-search-button" onclick="openGlobalSearch()" aria-label="Search all records (Control or Command plus K)"><span class="nav-icon">🔎</span><span>Search</span><span class="fs12" style="margin-left:auto">Ctrl K</span></button>
   <a class="nav-item active" data-sec="dashboard"><span class="nav-icon">📊</span><span>Dashboard</span><span class="nav-badge" id="nb-dash" style="display:none">0</span></a>
   <a class="nav-item" data-sec="properties"><span class="nav-icon">🏠</span><span>Properties</span></a>
   <a class="nav-item" data-sec="tenants"><span class="nav-icon">👥</span><span>Tenants</span></a>
@@ -431,11 +455,15 @@ body.dark .ps-item{background:var(--bg)}
     <div class="row">
       <span style="font-size:12px;color:var(--muted);padding:6px 10px;background:rgba(252,209,22,.08);border-radius:6px;border:1px solid rgba(252,209,22,.2)">🇬🇭 <strong style="color:var(--gold)">Akwaaba</strong></span>
       <button class="btn btn-ghost btn-sm" onclick="nav('reminders')">View All Alerts</button>
-      <button class="btn btn-gold" onclick="openPayModal()">+ Record Payment</button>
+      <button class="btn btn-gold" onclick="startPaymentEntry()">+ Record Payment</button>
     </div>
   </div>
   <div class="stat-grid" id="dash-stats"></div>
   <div id="dash-alerts" style="margin-bottom:20px"></div>
+  <div class="dash-tools">
+    <div id="setup-checklist" class="card"></div>
+    <div id="backup-status-card" class="card backup-card"></div>
+  </div>
   <div class="dash-grid">
     <div class="card"><div class="card-title">Recent Payments</div><div id="dash-payments"></div></div>
     <div class="card"><div class="card-title">Leases Expiring Soon</div><div id="dash-leases"></div></div>
@@ -468,7 +496,7 @@ body.dark .ps-item{background:var(--bg)}
 <section class="section" id="section-rent">
   <div class="ph">
     <div class="ph-left"><h2>Rent Tracker</h2><p>Track payments and outstanding balances</p></div>
-    <button class="btn btn-gold" onclick="openPayModal()">+ Record Payment</button>
+    <button class="btn btn-gold" onclick="startPaymentEntry()">+ Record Payment</button>
   </div>
   <div class="search"><span>🔍</span><input type="text" id="rent-search" placeholder="Search tenants…" oninput="renderRent()"></div>
   <div id="rent-schedule" class="card" style="display:none;margin-bottom:16px"></div>
@@ -527,6 +555,7 @@ body.dark .ps-item{background:var(--bg)}
     </div>
   </div>
   <div class="stat-grid" id="rep-stats"></div>
+  <div id="rep-empty-guidance" class="alert alert-blue" style="display:none"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px" class="rep-charts">
     <div class="card"><div class="card-title">Monthly Income vs Expenses</div><div class="chart-box"><canvas id="chart1"></canvas></div></div>
     <div class="card"><div class="card-title">Collection Rate by Property</div><div class="chart-box"><canvas id="chart2"></canvas></div></div>
@@ -586,6 +615,7 @@ body.dark .ps-item{background:var(--bg)}
     <div class="card">
       <div class="card-title">Data Backup & Restore</div>
       <p class="fs13 c-muted" style="margin-bottom:14px">Export your records and saved agreements as one backup. Keep backups somewhere safe; restoring replaces records and any included documents.</p>
+      <p id="backup-settings-status" class="backup-status"></p>
       <div class="row">
         <button class="btn btn-navy" onclick="exportBackup()">⬇ Export Backup</button>
         <label class="btn btn-ghost" style="cursor:pointer">⬆ Import Backup<input type="file" accept=".json" style="display:none" onchange="importBackup(this)"></label>
@@ -879,6 +909,14 @@ body.dark .ps-item{background:var(--bg)}
   </div>
 </div>
 
+<div class="modal-bg" id="m-search" role="dialog" aria-modal="true" aria-labelledby="search-title">
+  <div class="modal quick-search-modal">
+    <div class="modal-hd"><h3 id="search-title">Search all records</h3><button class="modal-close" aria-label="Close search" onclick="closeMod('m-search')">✕</button></div>
+    <div class="quick-search-field"><input id="global-search-input" type="search" maxlength="120" placeholder="Search tenants, properties, payments, notes…" autocomplete="off" oninput="renderGlobalSearchResults()" aria-label="Search all PropManager records"></div>
+    <div id="global-search-results" class="quick-search-results" aria-live="polite"></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="m-guide" role="dialog" aria-modal="true" aria-labelledby="guide-title">
   <div class="modal guide-modal">
     <div class="guide-header">
@@ -938,6 +976,8 @@ body.dark .ps-item{background:var(--bg)}
 // DATA LAYER
 // ═══════════════════════════════════════════════════════════
 const K = { props:'pm_props', tens:'pm_tens', pays:'pm_pays', exps:'pm_exps', maints:'pm_maints', notes:'pm_notes', sets:'pm_sets' };
+const BACKUP_EXPORTED_KEY='pm_backup_exported_at_v1';
+const BACKUP_REMINDER_DAYS=30;
 const storageErrors = new Set();
 const DOCUMENT_DB='propmanager-documents';
 const DOCUMENT_STORE='documents';
@@ -1180,6 +1220,88 @@ function openSmartGuide() {
   document.getElementById('guide-input').focus();
 }
 
+let globalSearchVersion=0;
+function openGlobalSearch() {
+  document.getElementById('global-search-input').value='';
+  renderGlobalSearchResults();
+  openMod('m-search');
+  document.getElementById('global-search-input').focus();
+}
+function searchableText(value) {
+  return String(value??'').toLocaleLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'');
+}
+function collectSearchRecords() {
+  const properties=load(K.props),tenants=load(K.tens),payments=load(K.pays),expenses=load(K.exps),maintenance=load(K.maints),notes=load(K.notes);
+  const records=[];
+  properties.forEach(item=>records.push({type:'Property',icon:'🏠',title:item.name,subtitle:[item.address,item.type].filter(Boolean).join(' · '),search:[item.name,item.address,item.type,item.notes,item.units],action:()=>{nav('properties');openPropModal(item.id)}}));
+  tenants.forEach(item=>records.push({type:'Tenant',icon:'👤',title:item.name,subtitle:[propName(item.propertyId),item.unit,item.phone].filter(Boolean).join(' · '),search:[item.name,item.phone,item.email,item.nationalId,item.ecName,item.ecPhone,item.unit,item.notes,propName(item.propertyId)],action:()=>{nav('tenants');document.getElementById('ten-search').value='';renderTenants();openTenModal(item.id)}}));
+  payments.forEach(item=>{
+    const tenant=tenants.find(entry=>entry.id===item.tenantId);
+    records.push({type:'Payment',icon:'💰',title:`${tenant?.name||'Payment'} · ${cur()} ${fmt(item.amount)}`,subtitle:[fmtD(item.datePaid),item.method,item.receiptNo].filter(Boolean).join(' · '),search:[tenant?.name,item.datePaid,item.method,item.receiptNo,item.notes,item.amount,propName(tenant?.propertyId)],action:()=>{nav('rent');if(tenant)showHist(tenant.id)}});
+  });
+  expenses.forEach(item=>records.push({type:'Expense',icon:'🧾',title:item.description||item.type||'Expense',subtitle:[propName(item.propertyId),fmtD(item.date),`${cur()} ${fmt(item.amount)}`].join(' · '),search:[item.description,item.type,item.vendor,item.receiptNo,item.amount,item.date,propName(item.propertyId)],action:()=>{nav('expenses');openExpModal(item.id)}}));
+  maintenance.forEach(item=>records.push({type:'Maintenance',icon:'🔧',title:item.title,subtitle:[propName(item.propertyId),item.unit,item.status,fmtD(item.dateReported)].filter(Boolean).join(' · '),search:[item.title,item.description,item.contractor,item.contractorPhone,item.priority,item.status,item.unit,propName(item.propertyId)],action:()=>{nav('maintenance');openMaintModal(item.id)}}));
+  notes.forEach(item=>records.push({type:'Note',icon:'📝',title:item.title,subtitle:(item.body||'').slice(0,100),search:[item.title,item.body],action:()=>{nav('notes');openNoteModal(item.id)}}));
+  return records;
+}
+async function renderGlobalSearchResults() {
+  const version=++globalSearchVersion;
+  const query=searchableText(document.getElementById('global-search-input').value.trim());
+  const container=document.getElementById('global-search-results');
+  container.replaceChildren();
+  if(!query) {
+    const hint=document.createElement('p');hint.className='c-muted fs13';hint.textContent='Search properties, tenants, payments, expenses, maintenance, notes and saved documents.';
+    container.appendChild(hint);return;
+  }
+  const tokens=query.split(/\s+/).filter(Boolean);
+  let records=collectSearchRecords(),documentSearchError='';
+  try {
+    const tenants=load(K.tens);
+    const documents=(await allDocumentRecords()).filter(item=>['signed-agreement','imported-signed-document'].includes(item.kind));
+    documents.forEach(item=>{
+      const tenant=tenants.find(entry=>entry.id===item.tenantId);
+      records.push({type:'Saved document',icon:'📎',title:item.name,subtitle:[tenant?.name,item.kind==='signed-agreement'?'Signed agreement':'Imported file',fmtD(item.createdAt)].filter(Boolean).join(' · '),search:[item.name,item.kind,tenant?.name],action:async()=>{nav('notes');await refreshAgreementsList();const row=[...document.querySelectorAll('#agreements-list tr[data-document-id]')].find(element=>element.dataset.documentId===item.id);row?.scrollIntoView({behavior:'smooth',block:'center'})}});
+    });
+  } catch(error) {
+    console.error('Could not search saved offline documents',error);
+    documentSearchError='Saved documents could not be searched because offline document storage is unavailable.';
+  }
+  if(version!==globalSearchVersion)return;
+  const matches=records.filter(record=>{
+    const haystack=searchableText([record.title,record.subtitle,...record.search].filter(Boolean).join(' '));
+    return tokens.every(token=>haystack.includes(token));
+  }).slice(0,50);
+  if(!matches.length) {
+    const empty=document.createElement('p');empty.className='c-muted fs13';empty.textContent='No matching records. Try a different name, phone number or keyword.';
+    container.appendChild(empty);
+    if(documentSearchError) {
+      const warning=document.createElement('p');warning.className='alert alert-warn';warning.textContent=documentSearchError;container.appendChild(warning);
+    }
+    return;
+  }
+  matches.forEach(record=>{
+    const button=document.createElement('button');button.type='button';button.className='quick-search-result';
+    const icon=document.createElement('span');icon.className='quick-search-icon';icon.textContent=record.icon;
+    const copy=document.createElement('span');copy.className='quick-search-copy';
+    const title=document.createElement('span');title.className='quick-search-title';title.textContent=record.title||record.type;
+    const subtitle=document.createElement('span');subtitle.className='quick-search-subtitle';subtitle.textContent=record.subtitle||'';
+    const type=document.createElement('span');type.className='quick-search-type';type.textContent=record.type;
+    copy.append(title,subtitle);button.append(icon,copy,type);
+    button.addEventListener('click',()=>{closeMod('m-search');record.action()});
+    container.appendChild(button);
+  });
+  if(documentSearchError) {
+    const warning=document.createElement('p');warning.className='alert alert-warn';warning.textContent=documentSearchError;container.appendChild(warning);
+  }
+}
+document.addEventListener('keydown',event=>{
+  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k') {
+    event.preventDefault();openGlobalSearch();
+  } else if(event.key==='Escape'&&document.getElementById('m-search').classList.contains('open')) {
+    closeMod('m-search');
+  }
+});
+
 // ═══════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════
@@ -1333,19 +1455,75 @@ function renderDash() {
   document.getElementById('nb-dash').textContent = count; document.getElementById('nb-dash').style.display = count ? '' : 'none';
   document.getElementById('nb-rem').textContent  = count; document.getElementById('nb-rem').style.display  = count ? '' : 'none';
   document.getElementById('dash-alerts').innerHTML = alerts.length ? alerts.join('') : '<div class="alert alert-green">✓ All accounts are in good standing</div>';
+  updateSetupChecklist();
+  updateBackupStatus();
 
   // Recent payments
   const allTens = load(K.tens);
   const recent = [...pays].sort((a,b)=>String(b.datePaid).localeCompare(String(a.datePaid))).slice(0,6);
   document.getElementById('dash-payments').innerHTML = recent.length
     ? `<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Amount</th><th>Date</th></tr></thead><tbody>${recent.map(p=>{ const t=allTens.find(x=>x.id===p.tenantId); return `<tr><td class="fw7">${escapeHtml(t?.name||'—')}</td><td class="c-ok fw7">${c} ${fmt(p.amount)}</td><td>${fmtD(p.datePaid)}</td></tr>` }).join('')}</tbody></table></div>`
-    : '<p class="c-muted fs13">No payments recorded yet.</p>';
+    : '<div class="empty" style="padding:24px 12px"><div class="ei" style="font-size:30px">💰</div><h3>No payments yet</h3><p>Record rent received to start building your payment history.</p><button class="btn btn-gold btn-sm" onclick="startPaymentEntry()">+ Record Payment</button></div>';
 
   // Lease expiry
   const expiring = load(K.tens).filter(t=>{ if(!t.leaseEnd) return false; const d=days(now,t.leaseEnd); return d>=0&&d<=60 }).sort((a,b)=>String(a.leaseEnd).localeCompare(String(b.leaseEnd)));
   document.getElementById('dash-leases').innerHTML = expiring.length
     ? `<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Expires</th><th>Days</th></tr></thead><tbody>${expiring.map(t=>{ const d=days(now,t.leaseEnd); return `<tr><td class="fw7">${escapeHtml(t.name)}</td><td>${fmtD(t.leaseEnd)}</td><td class="${d<=7?'c-bad':d<=30?'c-warn':''} fw7">${d}d</td></tr>` }).join('')}</tbody></table></div>`
-    : '<p class="c-muted fs13">No leases expiring within 60 days.</p>';
+    : '<p class="c-muted fs13">No leases are due to expire in the next 60 days. Add lease end dates to tenant records to see them here.</p>';
+}
+
+function startPaymentEntry() {
+  if(load(K.tens).some(tenant=>tenant.status==='Active')){openPayModal();return}
+  startTenantEntry();
+}
+function startTenantEntry() {
+  if(!load(K.props).length){openPropModal();return}
+  nav('tenants');openTenModal();
+}
+
+function updateSetupChecklist() {
+  const container=document.getElementById('setup-checklist');
+  if(!container)return;
+  const properties=load(K.props),tenants=load(K.tens),payments=load(K.pays),expenses=load(K.exps);
+  const tasks=[
+    {done:properties.length>0,label:'Add your first property',button:'+ Add property'},
+    {done:tenants.length>0,label:'Add a tenant and lease',button:properties.length?'+ Add tenant':'Add a property first'},
+    {done:payments.length>0,label:'Record your first rent payment',button:tenants.some(tenant=>tenant.status==='Active')?'+ Record payment':properties.length?'Add a tenant first':'Add a property first'},
+    {done:expenses.length>0,label:'Log a property expense',button:properties.length?'+ Add expense':'Add a property first'}
+  ];
+  const completed=tasks.filter(task=>task.done).length;
+  if(completed===tasks.length){container.style.display='none';return}
+  container.style.display='';
+  container.innerHTML=`<div class="card-title">Your first steps <span class="badge b-gray" style="margin-left:6px">${completed} of ${tasks.length}</span></div>
+    <p class="fs12 c-muted" style="margin:-8px 0 14px">A quick setup checklist. It disappears when you’re all set.</p>
+    <div class="setup-list">${tasks.map(task=>`<div class="setup-item"><span class="setup-check">${task.done?'✓':'·'}</span><span>${task.label}</span>${task.done?'':`<button class="btn btn-ghost btn-sm setup-action" onclick="setupChecklistAction(${inlineArg(tasks.indexOf(task))})">${task.button}</button>`}</div>`).join('')}</div>`;
+}
+function setupChecklistAction(index) {
+  const properties=load(K.props);
+  if(index===0){openPropModal();return}
+  if(index===1){startTenantEntry();return}
+  if(index===2){startPaymentEntry();return}
+  if(index===3){if(properties.length)openExpModal();else openPropModal()}
+}
+function formatBackupDate(value) {
+  const date=new Date(value);
+  if(Number.isNaN(date.getTime()))return '';
+  return date.toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'});
+}
+function updateBackupStatus() {
+  const dashboard=document.getElementById('backup-status-card');
+  const settings=document.getElementById('backup-settings-status');
+  const exportedAt=localStorage.getItem(BACKUP_EXPORTED_KEY);
+  const time=exportedAt?Date.parse(exportedAt):NaN;
+  const valid=Number.isFinite(time)&&time<=Date.now();
+  const overdue=!valid||Date.now()-time>BACKUP_REMINDER_DAYS*86400000;
+  const status=valid?`Most recent backup download started ${formatBackupDate(exportedAt)}.`:'No backup download has been started from this device yet.';
+  const reminder=overdue?'Export a backup regularly and keep the file somewhere safe in case this browser data is lost.':'A recent backup download was started on this device. Keep the exported file somewhere safe.';
+  if(dashboard) {
+    dashboard.classList.toggle('needs-backup',overdue);
+    dashboard.innerHTML=`<div class="card-title">${overdue?'🛡️ Back up your data':'✓ Recent backup export recorded'}</div><p class="backup-status">${status} ${reminder}</p><button class="btn ${overdue?'btn-gold':'btn-ghost'} btn-sm" onclick="exportBackup()">⬇ Export Backup</button>`;
+  }
+  if(settings)settings.textContent=`${status} ${reminder}`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1372,12 +1550,12 @@ function saveProp() {
   const arr=load(K.props); const id=document.getElementById('p-id').value;
   const ob={ id:id||uid(), name, address:addr, type:document.getElementById('p-type').value, units:document.getElementById('p-units').value, cost:document.getElementById('p-cost').value, yearBuilt:document.getElementById('p-year').value, notes:document.getElementById('p-notes').value, createdAt:new Date().toISOString() };
   if(id){ const i=arr.findIndex(x=>x.id===id); arr[i]=ob } else arr.push(ob);
-  save(K.props,arr); closeMod('m-prop'); renderProps(); toast('Property saved','ok');
+  save(K.props,arr); closeMod('m-prop'); renderProps(); updateSetupChecklist(); toast('Property saved','ok');
 }
 
 function delProp(id) {
   if(!confirm('Delete this property?')) return;
-  save(K.props, load(K.props).filter(p=>p.id!==id)); renderProps(); toast('Property deleted','warn');
+  save(K.props, load(K.props).filter(p=>p.id!==id)); renderProps(); updateSetupChecklist(); toast('Property deleted','warn');
 }
 
 function renderProps() {
@@ -1413,6 +1591,7 @@ let _origLeaseEnd = '';
 let _origFreq = '';
 
 function openTenModal(id) {
+  if(!id&&!load(K.props).length){toast('Add a property before adding a tenant','warn');openPropModal();return}
   const photoPreview=document.getElementById('t-photo-preview');
   if(photoPreview.dataset.previewUrl){URL.revokeObjectURL(photoPreview.dataset.previewUrl);delete photoPreview.dataset.previewUrl}
   ['t-id','t-name','t-phone','t-email','t-gid','t-ecname','t-ecphone','t-unit','t-rent','t-start','t-end','t-dep','t-notes'].forEach(i=>document.getElementById(i).value='');
@@ -1718,7 +1897,7 @@ function renderTenants() {
       <td><span class="badge ${sBadge(t.status)}">${escapeHtml(t.status)}</span></td>
       <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openTenModal(${inlineArg(t.id)})">✏</button><button class="btn btn-red btn-sm" onclick="delTen(${inlineArg(t.id)})">🗑</button></div></td>
     </tr>`;
-  }).join('') : `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">No tenants found.</td></tr>`;
+  }).join('') : `<tr><td colspan="9">${q?`<div class="empty" style="padding:28px 12px"><div class="ei" style="font-size:30px">🔎</div><h3>No matching tenants</h3><p>Try another name, phone number or property.</p><button class="btn btn-ghost btn-sm" onclick="document.getElementById('ten-search').value='';renderTenants()">Clear search</button></div>`:`<div class="empty" style="padding:28px 12px"><div class="ei" style="font-size:30px">👥</div><h3>No tenants yet</h3><p>Add a tenant to connect people, leases and rent to your properties.</p><button class="btn btn-gold btn-sm" onclick="openTenModal()">${load(K.props).length?'+ Add Tenant':'+ Add Property'}</button></div>`}</td></tr>`;
   hydrateTenantPhotos().catch(error=>{console.error('Could not load tenant photos',error);toast('Could not load tenant photos from offline storage','err')});
 }
 
@@ -1988,7 +2167,7 @@ function renderRent() {
       <td><span class="badge ${stCls}">${stLbl}</span></td>
       <td><div class="row"><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">+ Pay</button><button class="btn btn-ghost btn-sm" onclick="showSchedule(${inlineArg(t.id)})">Schedule</button><button class="btn btn-ghost btn-sm" onclick="showHist(${inlineArg(t.id)})">📋</button></div></td>
     </tr>`
-  }).join('') : `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">No active tenants.</td></tr>`;
+  }).join('') : `<tr><td colspan="9"><div class="empty" style="padding:28px 12px"><div class="ei" style="font-size:30px">💰</div><h3>${q?'No matching rent records':'No active tenants to track'}</h3><p>${q?'Try another tenant name.':'Add an active tenant with rent and lease details to start tracking balances and payments.'}</p>${q?`<button class="btn btn-ghost btn-sm" onclick="document.getElementById('rent-search').value='';renderRent()">Clear search</button>`:`<button class="btn btn-gold btn-sm" onclick="startTenantEntry()">${load(K.props).length?'+ Add Tenant':'+ Add Property'}</button>`}</div></td></tr>`;
 }
 
 function showSchedule(tenantId) {
@@ -2030,13 +2209,22 @@ function renderRem() {
     if(dLeft!==null&&dLeft>=0&&dLeft<=30) expiring.push({...t,dLeft});
   });
 
-  const section=(title,icon,col,items,rowFn)=>`
+  const section=(title,icon,col,items,rowFn)=>{
+    const emptyDescription=!tens.length
+      ?'Add an active tenant with rent and lease dates to see reminders here.'
+      :title==='Overdue Rent'
+        ?'No unpaid rent is currently overdue.'
+        :title==='Due Within 7 Days'
+          ?'No unpaid rent is due within the next 7 days.'
+          :'No lease ends within the next 30 days. Review lease end dates on tenant records.';
+    return `
     <div class="card" style="margin-bottom:16px;border-left:5px solid ${col}">
       <div class="card-title">${icon} ${title} <span class="badge b-gray" style="font-size:11px;margin-left:6px">${items.length}</span></div>
       ${items.length
         ? `<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Property</th><th>Detail</th><th>Action</th></tr></thead><tbody>${items.map(rowFn).join('')}</tbody></table></div>`
-        : `<p class="fs13 c-muted">None — you're all clear here.</p>`}
+        : `<div class="empty" style="padding:18px 10px"><div class="ei" style="font-size:28px">✓</div><h3>${title==='Overdue Rent'?'No overdue rent':title==='Due Within 7 Days'?'Nothing due in the next 7 days':'No leases expiring soon'}</h3><p>${emptyDescription}</p>${tens.length?'':`<button class="btn btn-ghost btn-sm" onclick="startTenantEntry()">${load(K.props).length?'+ Add Tenant':'+ Add Property'}</button>`}</div>`}
     </div>`;
+  };
 
   document.getElementById('rem-content').innerHTML =
     section('Overdue Rent','⚠','var(--bad)',overdue, t=>{
@@ -2063,6 +2251,7 @@ function renderRem() {
 // EXPENSES
 // ═══════════════════════════════════════════════════════════
 function openExpModal(id) {
+  if(!id&&!load(K.props).length){toast('Add a property before recording an expense','warn');openPropModal();return}
   ['e-id','e-amt','e-vendor','e-ref','e-desc'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('e-date').value=today(); document.getElementById('e-type').value='Repair';
   document.getElementById('m-exp-title').textContent='Add Expense'; fillPropDrops();
@@ -2083,12 +2272,12 @@ function saveExp() {
   const arr=load(K.exps); const id=document.getElementById('e-id').value;
   const ob={ id:id||uid(), propertyId:prop, type:document.getElementById('e-type').value, amount:Number(amt), date, vendor:document.getElementById('e-vendor').value, receiptNo:document.getElementById('e-ref').value, description:document.getElementById('e-desc').value, createdAt:new Date().toISOString() };
   if(id){ const i=arr.findIndex(x=>x.id===id); arr[i]=ob } else arr.push(ob);
-  save(K.exps,arr); closeMod('m-exp'); renderExp(); toast('Expense saved','ok');
+  save(K.exps,arr); closeMod('m-exp'); renderExp(); updateSetupChecklist(); toast('Expense saved','ok');
 }
 
 function delExp(id) {
   if(!confirm('Delete this expense?')) return;
-  save(K.exps, load(K.exps).filter(e=>e.id!==id)); renderExp(); toast('Expense deleted','warn');
+  save(K.exps, load(K.exps).filter(e=>e.id!==id)); renderExp(); updateSetupChecklist(); toast('Expense deleted','warn');
 }
 
 function renderExp() {
@@ -2113,7 +2302,7 @@ function renderExp() {
       <td class="fw7 c-bad">${c} ${fmt(e.amount)}</td>
       <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openExpModal(${inlineArg(e.id)})">✏</button><button class="btn btn-red btn-sm" onclick="delExp(${inlineArg(e.id)})">🗑</button></div></td>
     </tr>`;
-  }).join('') : `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">No expenses recorded yet.</td></tr>`;
+  }).join('') : `<tr><td colspan="7"><div class="empty" style="padding:28px 12px"><div class="ei" style="font-size:30px">🧾</div><h3>No expenses yet</h3><p>Log property costs here. They’ll appear in your financial reports.</p><button class="btn btn-gold btn-sm" onclick="openExpModal()">${load(K.props).length?'+ Add Expense':'+ Add Property'}</button></div></td></tr>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2122,6 +2311,7 @@ function renderExp() {
 let mFilt='all';
 
 function openMaintModal(id) {
+  if(!id&&!load(K.props).length){toast('Add a property before logging maintenance','warn');openPropModal();return}
   ['mn-id','mn-unit','mn-title','mn-fixed','mn-con','mn-conph','mn-cost','mn-desc'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('mn-pri').value='Medium'; document.getElementById('mn-status').value='Pending';
   document.getElementById('mn-reported').value=today(); document.getElementById('m-maint-title').textContent='Log Maintenance Job';
@@ -2178,7 +2368,7 @@ function renderMaint() {
       <td><span class="badge ${stBdg(m.status)}">${escapeHtml(m.status)}</span></td>
       <td><div class="row"><button class="btn btn-ghost btn-sm" onclick="openMaintModal(${inlineArg(m.id)})">✏</button><button class="btn btn-red btn-sm" onclick="delMaint(${inlineArg(m.id)})">🗑</button></div></td>
     </tr>`;
-  }).join('') : `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">No jobs found.</td></tr>`;
+  }).join('') : `<tr><td colspan="8"><div class="empty" style="padding:28px 12px"><div class="ei" style="font-size:30px">🔧</div><h3>${mFilt==='all'?'No maintenance jobs yet':`No ${escapeHtml(mFilt.toLowerCase())} jobs`}</h3><p>${mFilt==='all'?'Log a repair or maintenance task to track its priority, contractor and progress.':'Try another status filter or add a new maintenance job.'}</p><button class="btn btn-gold btn-sm" onclick="mFilt='all';openMaintModal()">${load(K.props).length?'+ Log Job':'+ Add Property'}</button></div></td></tr>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2203,6 +2393,9 @@ function renderReports() {
   }));
   const annualExpected=expectedByMonth.reduce((sum,amount)=>sum+amount,0);
   const rate=annualExpected>0?Math.round(totInc/annualExpected*100):0;
+  const reportGuidance=document.getElementById('rep-empty-guidance');
+  reportGuidance.style.display=pays.length||exps.length?'none':'block';
+  reportGuidance.textContent=`No income or expenses are recorded for ${year} yet. Add tenant lease details, record rent payments or log property expenses to build this report.`;
 
   document.getElementById('rep-stats').innerHTML=`
     <div class="stat-card"><div class="stat-ic ic-green">💰</div><div><div class="stat-val">${c} ${fmt(totInc)}</div><div class="stat-lbl">Total Income ${year}</div></div></div>
@@ -2820,8 +3013,8 @@ async function refreshAgreementsList() {
     const documents=(await allDocumentRecords()).filter(record=>['signed-agreement','imported-signed-document'].includes(record.kind)),tenants=load(K.tens);
     container.innerHTML=documents.length?`<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Document</th><th>Saved</th><th>Actions</th></tr></thead><tbody>${documents.map(record=>{
       const tenant=tenants.find(item=>item.id===record.tenantId);
-      return `<tr><td>${escapeHtml(tenant?.name||'Tenant removed')}</td><td>${escapeHtml(record.name)}</td><td>${escapeHtml(fmtD(record.createdAt))}</td><td><div class="row"><button class="btn btn-ghost btn-sm" onclick="downloadStoredDocument(${inlineArg(record.id)})">Download</button><button class="btn btn-ghost btn-sm" onclick="shareStoredDocument(${inlineArg(record.id)})">Share</button><button class="btn btn-red btn-sm" onclick="deleteStoredDocument(${inlineArg(record.id)})">Delete</button></div></td></tr>`;
-    }).join('')}</tbody></table></div>`:'<p class="fs12 c-muted">No signed agreements or imported files saved on this device yet.</p>';
+      return `<tr data-document-id="${escapeHtml(record.id)}"><td>${escapeHtml(tenant?.name||'Tenant removed')}</td><td>${escapeHtml(record.name)}</td><td>${escapeHtml(fmtD(record.createdAt))}</td><td><div class="row"><button class="btn btn-ghost btn-sm" onclick="downloadStoredDocument(${inlineArg(record.id)})">Download</button><button class="btn btn-ghost btn-sm" onclick="shareStoredDocument(${inlineArg(record.id)})">Share</button><button class="btn btn-red btn-sm" onclick="deleteStoredDocument(${inlineArg(record.id)})">Delete</button></div></td></tr>`;
+    }).join('')}</tbody></table></div>`:'<div class="empty" style="padding:22px 12px"><div class="ei" style="font-size:30px">📎</div><h3>No saved agreements yet</h3><p>Create an agreement to sign or import a signed PDF or photo. Saved files stay on this device.</p></div>';
   } catch(error){console.error('Could not load offline documents',error);container.textContent='Offline document storage is unavailable in this browser.'}
 }
 
@@ -2844,7 +3037,7 @@ function renderNotes() {
       </div>
     </div>`;
   }).join('')}</div>`
-  : `<div class="empty"><div class="ei">📝</div><h3>No saved notes yet</h3><p>Use a template above to create your first document.</p></div>`;
+  : `<div class="empty"><div class="ei">📝</div><h3>No saved notes yet</h3><p>Start with a ready-made letter or write a note of your own.</p><button class="btn btn-gold btn-sm" onclick="openNoteModal()">+ Write a Note</button></div>`;
 
   document.getElementById('notes-grid').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px">
@@ -2883,6 +3076,7 @@ async function loadSettings() {
     preview.src=url;preview.style.display=url?'block':'none';
     sidebar.src=url;sidebar.style.display=url?'block':'none';
   } catch(error){console.error('Could not load owner photo',error);toast('Could not load the owner profile photo','err')}
+  updateBackupStatus();
   refreshSafetyStatus();
 }
 
@@ -3395,11 +3589,26 @@ async function exportBackup() {
     toast('Could not export backup. Check stored data and offline document storage.','err');
     return;
   }
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=`propmanager-backup-${today()}.json`; a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-  toast('Backup exported','ok');
+  let url='';
+  try {
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a');url=URL.createObjectURL(blob);
+    a.href=url;a.download=`propmanager-backup-${today()}.json`;a.click();
+  } catch(error) {
+    if(url)URL.revokeObjectURL(url);
+    console.error('Could not start backup download',error);
+    toast('Could not start the backup download','err');
+    return;
+  }
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  try {
+    localStorage.setItem(BACKUP_EXPORTED_KEY,new Date().toISOString());
+    updateBackupStatus();
+    toast('Backup exported','ok');
+  } catch(error) {
+    console.error('Backup was created but export date could not be saved',error);
+    toast('Backup download started, but its export date could not be saved on this device','warn');
+  }
 }
 
 function isValidBackup(data) {

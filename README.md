@@ -51,6 +51,7 @@ If that address returns 404, check that Pages is enabled with **GitHub Actions**
 - Nothing is sent to any server
 - GitHub only hosts the app files, not your data
 - Use **Settings → Data Backup & Restore** regularly. Backups include saved documents and can be large.
+- The Dashboard reminds you to export a backup if none has been started on this browser or the last recorded download is more than 30 days old. This reminder stores only a local date—not a copy of the backup—and a started download does not confirm that the file was saved. Keep the exported file somewhere safe.
 - Browser storage can be cleared by the browser/device. A backup is the way to move or recover your data on another device.
 
 ## Profiles and Appearance
@@ -70,6 +71,8 @@ If that address returns 404, check that Pages is enabled with **GitHub Actions**
 ## Welcome and App Lock
 - On first use, a short welcome explains offline storage and backups, followed by an optional guided tour with plain-language tips for each main section. Move through it with **Next** and **Back**, or use the keyboard arrow keys; skip it or replay it from **App Tour** in the sidebar or **Settings → App Access → Take app tour**.
 - Use **Smart Guide** in the sidebar for built-in offline help, suggested questions and shortcuts to app sections. It answers common how-to questions without sending data online, reading private records or changing anything. It is a help guide, not a general-purpose AI or legal adviser.
+- Use the Dashboard’s first-steps checklist to add a property, tenant, first rent payment and expense. It hides after all four are recorded. Use **Search** in the sidebar or press **Ctrl/Command+K** to find properties, tenants, payments, expenses, maintenance jobs, notes and saved agreements on this device.
+- Empty sections offer a short explanation and a relevant next step, so it is clearer how to begin when there are no records yet.
 - Reopen the welcome intro from **Settings → App Access → View welcome intro**.
 - The optional app lock shares the PIN/password and recovery code above. It adds a **Lock app** button; it locks only when you choose it and stays locked across reloads until unlocked. It does not automatically lock on every app launch.
 - To unlock, enter the PIN/password; use the recovery code if needed. Disabling app lock requires the PIN/password, while destructive-action protection can remain enabled.
