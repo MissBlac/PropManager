@@ -184,10 +184,44 @@ tr:hover td{background:rgba(0,0,0,.015)}
 .modal-close{background:none;border:none;font-size:22px;color:var(--muted);line-height:1;padding:2px 6px;border-radius:6px}
 .modal-close:hover{background:var(--bg)}
 .modal-body{padding:24px}
-.tour-progress{height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin:0 24px 18px}
-.tour-progress span{display:block;height:100%;background:var(--gold);transition:width .2s ease}
-.tour-step-label{font-size:12px;color:var(--muted);margin-bottom:8px}
-.tour-copy{font-size:14px;line-height:1.65;color:var(--text)}
+.tour-modal{max-width:520px;border:1px solid rgba(240,165,0,.2);overflow:hidden}
+.tour-masthead{display:flex;align-items:center;justify-content:space-between;padding:18px 24px 0}
+.tour-brand{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:10px;font-weight:800;letter-spacing:1.1px}
+.tour-brand-mark{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg,var(--gh-green),#0b5135);color:#fff;font-size:10px;letter-spacing:0}
+.tour-masthead .modal-close{font-size:19px}
+.tour-progress{height:4px;background:var(--border);overflow:hidden;margin:15px 24px 0}
+.tour-progress span{display:block;height:100%;background:linear-gradient(90deg,var(--gh-green),var(--gold));transition:width .32s ease}
+.tour-body{padding:25px 32px 23px}
+.tour-content{animation:tour-step-enter .28s ease both}
+.tour-content.is-changing{animation:none;opacity:.45;transform:translateY(5px)}
+.tour-icon{display:grid;place-items:center;width:58px;height:58px;border-radius:18px;background:linear-gradient(145deg,rgba(240,165,0,.2),rgba(252,209,22,.08));border:1px solid rgba(240,165,0,.18);font-size:28px;margin-bottom:20px}
+.tour-step-label{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#8b6b18;margin-bottom:7px}
+.tour-title{font-size:25px;line-height:1.2;letter-spacing:-.4px;color:var(--navy);margin-bottom:10px}
+.tour-copy{font-size:14px;line-height:1.65;color:var(--text);min-height:46px}
+.tour-tip{margin-top:20px;padding:13px 15px;border-radius:11px;background:rgba(0,107,63,.06);border:1px solid rgba(0,107,63,.12)}
+.tour-tip span{display:block;font-size:9px;font-weight:800;letter-spacing:.9px;color:var(--gh-green);margin-bottom:4px}
+.tour-tip strong{font-size:12px;line-height:1.5;color:var(--navy)}
+.tour-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 24px;border-top:1px solid var(--border);background:rgba(244,246,251,.6)}
+.tour-nav-actions{display:flex;align-items:center;gap:8px}
+.tour-footer .btn:disabled{opacity:.45;cursor:default}
+.tour-next-icon{font-size:15px;line-height:1}
+@keyframes tour-step-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+body.dark .tour-title{color:var(--text)}
+body.dark .tour-tip{background:rgba(56,161,105,.09);border-color:rgba(56,161,105,.2)}
+body.dark .tour-tip strong{color:var(--text)}
+body.dark .tour-footer{background:rgba(15,23,42,.55)}
+@media(max-width:520px){
+  .tour-masthead{padding:16px 18px 0}
+  .tour-progress{margin-left:18px;margin-right:18px}
+  .tour-body{padding:22px 22px 20px}
+  .tour-title{font-size:22px}
+  .tour-footer{padding:14px 18px}
+  .tour-footer .btn{padding:8px 12px}
+}
+@media(prefers-reduced-motion:reduce){
+  .tour-progress span{transition:none}
+  .tour-content{animation:none}
+}
 
 /* ── ALERTS ── */
 .alert{display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border-radius:9px;font-size:13px;margin-bottom:8px}
@@ -770,19 +804,24 @@ body.dark .ps-item{background:var(--bg)}
 </div>
 
 <div class="modal-bg" id="m-tour" role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-copy">
-  <div class="modal" style="max-width:560px">
-    <div class="modal-hd">
-      <h3 id="tour-title">PropManager tour</h3>
+  <div class="modal tour-modal">
+    <div class="tour-masthead">
+      <div class="tour-brand"><span class="tour-brand-mark">PM</span><span>A QUICK WALKTHROUGH</span></div>
       <button class="modal-close" aria-label="Skip tour" onclick="finishAppTour()">✕</button>
     </div>
-    <div class="tour-progress" role="progressbar" aria-label="Tour progress" aria-valuemin="1" aria-valuemax="10" aria-valuenow="1"><span id="tour-progress-fill"></span></div>
-    <div class="modal-body" style="padding-top:0">
+    <div class="tour-progress" role="progressbar" aria-label="Tour progress" aria-valuemin="1" aria-valuemax="10" aria-valuenow="1" aria-valuetext="Step 1 of 10"><span id="tour-progress-fill"></span></div>
+    <div id="tour-content" class="tour-body tour-content" aria-live="polite" aria-atomic="true">
+      <div id="tour-icon" class="tour-icon" aria-hidden="true"></div>
       <p id="tour-step-label" class="tour-step-label"></p>
+      <h2 id="tour-title" class="tour-title"></h2>
       <p id="tour-copy" class="tour-copy"></p>
-      <div class="form-actions">
-        <button class="btn btn-ghost" onclick="finishAppTour()">Skip tour</button>
+      <div class="tour-tip"><span>GOOD TO KNOW</span><strong id="tour-tip"></strong></div>
+    </div>
+    <div class="tour-footer">
+      <button class="btn btn-ghost btn-sm" onclick="finishAppTour()">Skip tour</button>
+      <div class="tour-nav-actions">
         <button id="tour-back" class="btn btn-ghost" onclick="stepAppTour(-1)">Back</button>
-        <button id="tour-next" class="btn btn-gold" onclick="stepAppTour(1)">Next</button>
+        <button id="tour-next" class="btn btn-gold" onclick="stepAppTour(1)"><span id="tour-next-label">Next</span> <span id="tour-next-icon" class="tour-next-icon" aria-hidden="true">→</span></button>
       </div>
     </div>
   </div>
@@ -961,7 +1000,8 @@ function nav(sec) {
   if (renders[sec]) renders[sec]();
   if(document.getElementById('m-tour').classList.contains('open')) {
     const index=APP_TOUR_STEPS.findIndex(step=>step.section===sec);
-    if(index>=0)renderAppTourStep(index);
+    const progress=Number(document.querySelector('#m-tour [role="progressbar"]').getAttribute('aria-valuenow'))-1;
+    if(index>=0&&index!==progress)renderAppTourStep(index);
   }
 }
 document.querySelectorAll('.nav-item[data-sec]').forEach(n => n.addEventListener('click', () => nav(n.dataset.sec)));
@@ -2788,16 +2828,16 @@ const APP_LOCKED_KEY='pm_app_locked';
 const INTRO_SEEN_KEY='pm_intro_seen';
 const TOUR_SEEN_KEY='pm_tour_seen_v1';
 const APP_TOUR_STEPS=[
-  {section:'dashboard',title:'Dashboard',copy:'Your overview lives here: key totals, recent payments, lease expiries and alerts. Use Record Payment for a quick entry, or View All Alerts to review reminders.'},
-  {section:'properties',title:'Properties',copy:'Add each property you manage and keep its address, type and unit details together. You can link tenants to a property when you add their records.'},
-  {section:'tenants',title:'Tenants',copy:'Keep tenant contact, unit, rent and lease information in one place. Open a tenant record to review its details and related activity.'},
-  {section:'rent',title:'Rent Tracker',copy:'Review rent due, payments, arrears and lease balances. Record payments here or from the dashboard, and use the schedule to see how rent is allocated across lease periods.'},
-  {section:'reminders',title:'Reminders & Alerts',copy:'Check upcoming rent and lease dates. Reminders are calculated on this device when you open the app; they are not guaranteed to appear while the app is closed.'},
-  {section:'expenses',title:'Expenses',copy:'Record costs associated with your properties, including dates, vendors, categories and amounts. These entries feed into your financial reports.'},
-  {section:'maintenance',title:'Maintenance Log',copy:'Log repair jobs, set priority and status, and keep contractor and cost details together. Use the filters to find pending, in-progress or completed work.'},
-  {section:'reports',title:'Financial Reports',copy:'Review income, expenses, net profit and collection rates by month and property. Choose a year, then export a CSV or print the report.'},
-  {section:'notes',title:'Documents & Notes',copy:'Write and keep notes or letters, create lease agreements for on-screen signing, and import signed PDFs or photos. Documents stay on this device and are included in backups.'},
-  {section:'settings',title:'Settings and your data',copy:'Set your business profile, currency and appearance; export regular backups; and optionally enable app access protection. Your records are stored in this browser, not synced to an online account. Use Take app tour here whenever you want a refresher.'}
+  {section:'dashboard',icon:'📊',category:'Your daily overview',title:'Start with the big picture',copy:'See rent collected, overdue balances and recent activity at a glance.',tip:'Use “Record Payment” for a quick rent entry.'},
+  {section:'properties',icon:'🏠',category:'Set up your portfolio',title:'Add your properties',copy:'Keep each building, address and unit count in one place.',tip:'Add a property before linking tenants to it.'},
+  {section:'tenants',icon:'👥',category:'People & leases',title:'Keep tenant details handy',copy:'Save contact details, rent, unit and lease dates for each tenant.',tip:'Choose the matching property when you add a tenant.'},
+  {section:'rent',icon:'💰',category:'Track your income',title:'Stay on top of rent',copy:'Check what is due, what has been paid and what is still outstanding.',tip:'Record each payment so balances and reports stay up to date.'},
+  {section:'reminders',icon:'🔔',category:'Never miss a date',title:'See what needs attention',copy:'Review upcoming rent and lease dates whenever you open the app.',tip:'Reminders are checked on this device when the app is open.'},
+  {section:'expenses',icon:'🧾',category:'Know your costs',title:'Log property expenses',copy:'Record repairs, bills and other costs against a property.',tip:'Your expense entries flow into Financial Reports.'},
+  {section:'maintenance',icon:'🔧',category:'Keep work moving',title:'Follow repairs from start to finish',copy:'Track each job, its priority, contractor and current status.',tip:'Use the filters to find jobs that still need attention.'},
+  {section:'reports',icon:'📈',category:'Understand performance',title:'See how your portfolio is doing',copy:'Compare rent income and expenses to understand your results.',tip:'Choose a year, then export a CSV or print the report.'},
+  {section:'notes',icon:'📝',category:'Your property paperwork',title:'Keep notes and agreements together',copy:'Write notes, prepare agreements and store signed files.',tip:'Documents stay on this device and are included in backups.'},
+  {section:'settings',icon:'⚙️',category:'Make it yours',title:'Set up and protect your app',copy:'Add your business details, choose your look and manage backups.',tip:'Your records stay in this browser. Export a backup regularly.'}
 ];
 const SAFETY_ITERATIONS=210000;
 let safetyFlow=null;
@@ -2889,15 +2929,23 @@ function renderAppTourStep(index) {
   if(!step)return;
   const modal=document.getElementById('m-tour');
   const progress=modal.querySelector('[role="progressbar"]');
+  const content=document.getElementById('tour-content');
+  content.classList.remove('tour-content');
+  content.classList.add('is-changing');
+  document.getElementById('tour-icon').textContent=step.icon;
+  document.getElementById('tour-step-label').textContent=step.category;
   document.getElementById('tour-title').textContent=step.title;
-  document.getElementById('tour-step-label').textContent=`Step ${index+1} of ${APP_TOUR_STEPS.length}`;
   document.getElementById('tour-copy').textContent=step.copy;
+  document.getElementById('tour-tip').textContent=step.tip;
   document.getElementById('tour-back').disabled=index===0;
-  document.getElementById('tour-next').textContent=index===APP_TOUR_STEPS.length-1?'Finish':'Next';
+  document.getElementById('tour-next-label').textContent=index===APP_TOUR_STEPS.length-1?'Finish tour':'Next';
+  document.getElementById('tour-next-icon').textContent=index===APP_TOUR_STEPS.length-1?'✓':'→';
   modal.querySelector('.modal-close').setAttribute('aria-label',`Skip tour at step ${index+1}`);
   progress.setAttribute('aria-valuemax',String(APP_TOUR_STEPS.length));
   progress.setAttribute('aria-valuenow',String(index+1));
+  progress.setAttribute('aria-valuetext',`Step ${index+1} of ${APP_TOUR_STEPS.length}`);
   document.getElementById('tour-progress-fill').style.width=`${((index+1)/APP_TOUR_STEPS.length)*100}%`;
+  requestAnimationFrame(()=>{content.classList.remove('is-changing');content.classList.add('tour-content')});
 }
 function startAppTour() {
   closeMod('m-welcome');
@@ -2910,13 +2958,18 @@ function stepAppTour(direction) {
   const next=current+direction;
   if(next<0)return;
   if(next>=APP_TOUR_STEPS.length){finishAppTour();return}
-  renderAppTourStep(next);
   nav(APP_TOUR_STEPS[next].section);
 }
 function finishAppTour() {
   localStorage.setItem(TOUR_SEEN_KEY,'1');
   closeMod('m-tour');
 }
+document.addEventListener('keydown',event=>{
+  if(!document.getElementById('m-tour').classList.contains('open'))return;
+  if(event.key==='Escape'){finishAppTour();return}
+  if(event.key==='ArrowRight'){event.preventDefault();stepAppTour(1)}
+  if(event.key==='ArrowLeft'){event.preventDefault();stepAppTour(-1)}
+});
 function enableAppLockFromWelcome() {
   startAppLockEnable(true);
 }
