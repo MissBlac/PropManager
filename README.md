@@ -3,42 +3,21 @@
 
 ---
 
-## How to Deploy (5 Minutes)
+## Publish This Repository
 
-### Step 1 — Create a GitHub Account
-Go to https://github.com and sign up for a free account.
+The project is hosted in [MissBlac/PropManager](https://github.com/MissBlac/PropManager). You do not need to create another repository or upload the files again.
 
-### Step 2 — Create a New Repository
-1. Click the **+** button (top right) → **New repository**
-2. Name it: `propmanager` (or anything you like)
-3. Set it to **Public**
-4. Click **Create repository**
+To publish or check the live site:
+1. Open the repository's **Settings → Pages**.
+2. Under **Build and deployment**, select **Deploy from a branch**.
+3. Select branch **main** and folder **/(root)**, then click **Save**.
+4. Wait for GitHub Pages to finish deploying. The Pages settings show the published URL and deployment status.
 
-### Step 3 — Upload Your Files
-1. On the repository page, click **uploading an existing file**
-2. Drag and drop ALL files from this folder:
-   - index.html
-   - manifest.json
-   - sw.js
-   - icon.svg
-   - icon-192.png
-   - icon-512.png
-3. Click **Commit changes**
+The expected project-site URL is:
 
-### Step 4 — Enable GitHub Pages
-1. Click **Settings** (in your repository)
-2. Click **Pages** (left sidebar)
-3. Under "Source" select **Deploy from a branch**
-4. Set Branch to **main** and folder to **/ (root)**
-5. Click **Save**
+**https://missblac.github.io/PropManager/**
 
-### Step 5 — Get Your URL
-Wait 1–2 minutes, then your app is live at:
-```
-https://YOUR-USERNAME.github.io/propmanager/
-```
-
-Open that URL in Chrome on your phone or computer.
+If that address returns 404, GitHub Pages is not enabled/deployed for this repository yet, or the deployment has not finished. Confirm the Pages settings and check the repository's **Actions** tab for the Pages deployment status. Once published, open the URL in your device browser to use or install PropManager.
 
 ---
 
@@ -105,11 +84,9 @@ Open that URL in Chrome on your phone or computer.
 - Sharing to WhatsApp or another service is a user-initiated device action; the app does not connect to messaging accounts or send messages.
 
 ## Updating the App
-1. Make changes to `index.html`
-2. Go to your GitHub repository
-3. Click on `index.html` → click pencil icon → paste new content
-4. Or drag and drop the new file to replace it
-5. Changes go live in 1–2 minutes
+1. Make and commit changes to the project files on the `main` branch.
+2. GitHub Pages publishes the updated site from the repository's configured source. If deployment is not automatic, check **Actions** for the Pages deployment workflow/status.
+3. Wait for deployment to finish, then reload the published URL. A previously installed PWA may need a moment to receive its updated app shell.
 
 ---
 
