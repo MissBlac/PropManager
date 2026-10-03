@@ -57,7 +57,7 @@ If that address returns 404, check that Pages is enabled with **GitHub Actions**
 ## Profiles and Appearance
 - Add an owner photo and contact details in **Settings**, plus an optional tenant photo on each tenant record. Your Business / Landlord Name appears as the owner signature in the app sidebar and welcome screen.
 - The app credits its creator brand as **PropManager by MissBlac** in the sidebar and **Settings → About PropManager**, where the published app address is linked. This is separate from the landlord’s own business signature.
-- Choose an optional app wallpaper and adjust its visibility; reset it any time to return to the default background.
+- Choose an optional app wallpaper and adjust its visibility; reset it any time to return to the default background. The default and uploaded wallpapers have a gentle, drifting light effect for a more lifelike background. Turn motion off in **Settings → Appearance**; it also automatically pauses when the device requests reduced motion.
 - Photos and wallpaper are compressed and stored offline in this browser. Backup/restore includes them with saved documents, so use a fresh backup to transfer them to another device.
 - Images and records remain device/browser-specific until you export and restore a backup. Clearing browser storage removes the local copies.
 
@@ -71,6 +71,7 @@ If that address returns 404, check that Pages is enabled with **GitHub Actions**
 ## Welcome and App Lock
 - On first use, a short welcome explains offline storage and backups, followed by an optional guided tour with plain-language tips for each main section. Move through it with **Next** and **Back**, or use the keyboard arrow keys; skip it or replay it from **App Tour** in the sidebar or **Settings → App Access → Take app tour**.
 - Use **Smart Guide** in the sidebar for built-in offline help, suggested questions and shortcuts to app sections. It answers common how-to questions without sending data online, reading private records or changing anything. It is a help guide, not a general-purpose AI or legal adviser.
+- The **App Tour** and **Smart Guide** sidebar buttons have distinct compass and conversation icons so their roles are easier to recognize.
 - Use the Dashboard’s first-steps checklist to add a property, tenant, first rent payment and expense. It hides after all four are recorded. Use **Search** in the sidebar or press **Ctrl/Command+K** to find properties, tenants, payments, expenses, maintenance jobs, notes and saved agreements on this device.
 - Empty sections offer a short explanation and a relevant next step, so it is clearer how to begin when there are no records yet.
 - Reopen the welcome intro from **Settings → App Access → View welcome intro**.
