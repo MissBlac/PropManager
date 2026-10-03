@@ -184,6 +184,10 @@ tr:hover td{background:rgba(0,0,0,.015)}
 .modal-close{background:none;border:none;font-size:22px;color:var(--muted);line-height:1;padding:2px 6px;border-radius:6px}
 .modal-close:hover{background:var(--bg)}
 .modal-body{padding:24px}
+.tour-progress{height:6px;background:var(--border);border-radius:99px;overflow:hidden;margin:0 24px 18px}
+.tour-progress span{display:block;height:100%;background:var(--gold);transition:width .2s ease}
+.tour-step-label{font-size:12px;color:var(--muted);margin-bottom:8px}
+.tour-copy{font-size:14px;line-height:1.65;color:var(--text)}
 
 /* ── ALERTS ── */
 .alert{display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border-radius:9px;font-size:13px;margin-bottom:8px}
@@ -516,6 +520,7 @@ body.dark .ps-item{background:var(--bg)}
       <div class="row">
         <button id="app-lock-toggle" class="btn btn-ghost btn-sm" onclick="toggleAppLock()">Enable app lock</button>
         <button class="btn btn-ghost btn-sm" onclick="showWelcomeIntro()">View welcome intro</button>
+        <button class="btn btn-ghost btn-sm" onclick="startAppTour()">Take app tour</button>
       </div>
       <small class="c-muted" style="display:block;margin-top:10px">The app lock uses the same PIN/password and recovery code as destructive-action protection. It locks only when you choose Lock app; it does not lock automatically on reload.</small>
     </div>
@@ -749,14 +754,34 @@ body.dark .ps-item{background:var(--bg)}
     <div class="modal-hd"><h3>Welcome to PropManager</h3></div>
     <div class="modal-body">
       <p class="fs13" style="margin-bottom:12px">Manage properties, tenants, rent, payments, maintenance and lease documents from one place.</p>
+      <p class="fs13 c-muted" style="margin-bottom:12px">After this welcome, you can take a guided tour of the main sections. You can skip it or replay it later from Settings.</p>
       <div class="card" style="padding:14px;margin-bottom:14px">
         <strong>Works offline. Your records stay on this device.</strong>
         <p class="fs13 c-muted" style="margin-top:6px">Data is stored in this browser, not in an online account. Export backups regularly, especially before changing devices or clearing browser storage.</p>
       </div>
       <p id="welcome-lock-note" class="fs13 c-muted" style="margin-bottom:16px"></p>
       <div class="form-actions">
-        <button class="btn btn-ghost" onclick="finishWelcomeIntro()">Continue without app lock</button>
+        <button class="btn btn-ghost" onclick="finishWelcomeIntro()">Continue</button>
         <button id="welcome-lock-button" class="btn btn-gold" onclick="enableAppLockFromWelcome()">Enable app lock</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="m-tour" role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-copy">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hd">
+      <h3 id="tour-title">PropManager tour</h3>
+      <button class="modal-close" aria-label="Skip tour" onclick="finishAppTour()">✕</button>
+    </div>
+    <div class="tour-progress" role="progressbar" aria-label="Tour progress" aria-valuemin="1" aria-valuemax="10" aria-valuenow="1"><span id="tour-progress-fill"></span></div>
+    <div class="modal-body" style="padding-top:0">
+      <p id="tour-step-label" class="tour-step-label"></p>
+      <p id="tour-copy" class="tour-copy"></p>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="finishAppTour()">Skip tour</button>
+        <button id="tour-back" class="btn btn-ghost" onclick="stepAppTour(-1)">Back</button>
+        <button id="tour-next" class="btn btn-gold" onclick="stepAppTour(1)">Next</button>
       </div>
     </div>
   </div>
@@ -933,6 +958,10 @@ function nav(sec) {
   document.querySelectorAll('.nav-item').forEach(n => { n.classList.toggle('active', n.dataset.sec === sec) });
   document.querySelectorAll('.section').forEach(s => { s.classList.toggle('active', s.id === 'section-' + sec) });
   if (renders[sec]) renders[sec]();
+  if(document.getElementById('m-tour').classList.contains('open')) {
+    const index=APP_TOUR_STEPS.findIndex(step=>step.section===sec);
+    if(index>=0)renderAppTourStep(index);
+  }
 }
 document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => nav(n.dataset.sec)));
 
@@ -943,6 +972,7 @@ const openMod = id => document.getElementById(id).classList.add('open');
 const closeMod = id => document.getElementById(id).classList.remove('open');
 document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => {
   if(e.target!==m)return;
+  if(m.id==='m-tour'){finishAppTour();return}
   if(m.id==='m-welcome'||(m.id==='m-safety'&&safetyFlow?.target==='app-lock'))return;
   if(m.id==='m-safety')cancelSafetyFlow();
   else m.classList.remove('open');
@@ -2755,6 +2785,19 @@ const SAFETY_KEY='pm_destructive_guard_v1';
 const APP_LOCK_KEY='pm_app_lock_enabled';
 const APP_LOCKED_KEY='pm_app_locked';
 const INTRO_SEEN_KEY='pm_intro_seen';
+const TOUR_SEEN_KEY='pm_tour_seen_v1';
+const APP_TOUR_STEPS=[
+  {section:'dashboard',title:'Dashboard',copy:'Your overview lives here: key totals, recent payments, lease expiries and alerts. Use Record Payment for a quick entry, or View All Alerts to review reminders.'},
+  {section:'properties',title:'Properties',copy:'Add each property you manage and keep its address, type and unit details together. You can link tenants to a property when you add their records.'},
+  {section:'tenants',title:'Tenants',copy:'Keep tenant contact, unit, rent and lease information in one place. Open a tenant record to review its details and related activity.'},
+  {section:'rent',title:'Rent Tracker',copy:'Review rent due, payments, arrears and lease balances. Record payments here or from the dashboard, and use the schedule to see how rent is allocated across lease periods.'},
+  {section:'reminders',title:'Reminders & Alerts',copy:'Check upcoming rent and lease dates. Reminders are calculated on this device when you open the app; they are not guaranteed to appear while the app is closed.'},
+  {section:'expenses',title:'Expenses',copy:'Record costs associated with your properties, including dates, vendors, categories and amounts. These entries feed into your financial reports.'},
+  {section:'maintenance',title:'Maintenance Log',copy:'Log repair jobs, set priority and status, and keep contractor and cost details together. Use the filters to find pending, in-progress or completed work.'},
+  {section:'reports',title:'Financial Reports',copy:'Review income, expenses, net profit and collection rates by month and property. Choose a year, then export a CSV or print the report.'},
+  {section:'notes',title:'Documents & Notes',copy:'Write and keep notes or letters, create lease agreements for on-screen signing, and import signed PDFs or photos. Documents stay on this device and are included in backups.'},
+  {section:'settings',title:'Settings and your data',copy:'Set your business profile, currency and appearance; export regular backups; and optionally enable app access protection. Your records are stored in this browser, not synced to an online account. Use Take app tour here whenever you want a refresher.'}
+];
 const SAFETY_ITERATIONS=210000;
 let safetyFlow=null;
 function randomHex(bytes=16) {
@@ -2838,6 +2881,40 @@ function showWelcomeIntro() {
 function finishWelcomeIntro() {
   localStorage.setItem(INTRO_SEEN_KEY,'1');
   closeMod('m-welcome');
+  if(localStorage.getItem(TOUR_SEEN_KEY)!=='1')startAppTour();
+}
+function renderAppTourStep(index) {
+  const step=APP_TOUR_STEPS[index];
+  if(!step)return;
+  const modal=document.getElementById('m-tour');
+  const progress=modal.querySelector('[role="progressbar"]');
+  document.getElementById('tour-title').textContent=step.title;
+  document.getElementById('tour-step-label').textContent=`Step ${index+1} of ${APP_TOUR_STEPS.length}`;
+  document.getElementById('tour-copy').textContent=step.copy;
+  document.getElementById('tour-back').disabled=index===0;
+  document.getElementById('tour-next').textContent=index===APP_TOUR_STEPS.length-1?'Finish':'Next';
+  modal.querySelector('.modal-close').setAttribute('aria-label',`Skip tour at step ${index+1}`);
+  progress.setAttribute('aria-valuemax',String(APP_TOUR_STEPS.length));
+  progress.setAttribute('aria-valuenow',String(index+1));
+  document.getElementById('tour-progress-fill').style.width=`${((index+1)/APP_TOUR_STEPS.length)*100}%`;
+}
+function startAppTour() {
+  closeMod('m-welcome');
+  openMod('m-tour');
+  renderAppTourStep(0);
+  nav(APP_TOUR_STEPS[0].section);
+}
+function stepAppTour(direction) {
+  const current=Number(document.getElementById('m-tour').querySelector('[role="progressbar"]').getAttribute('aria-valuenow'))-1;
+  const next=current+direction;
+  if(next<0)return;
+  if(next>=APP_TOUR_STEPS.length){finishAppTour();return}
+  renderAppTourStep(next);
+  nav(APP_TOUR_STEPS[next].section);
+}
+function finishAppTour() {
+  localStorage.setItem(TOUR_SEEN_KEY,'1');
+  closeMod('m-tour');
 }
 function enableAppLockFromWelcome() {
   startAppLockEnable(true);
