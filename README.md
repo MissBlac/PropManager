@@ -10,15 +10,15 @@ The project is hosted in [MissBlac/PropManager](https://github.com/MissBlac/Prop
 This repository deploys the app to GitHub Pages using the workflow in `.github/workflows/pages.yml` whenever changes are pushed to `main`.
 
 To publish or check the live site:
-1. Open the repository's **Settings → Pages**. If GitHub asks for a source, select **GitHub Actions** under **Build and deployment**.
-2. Open the **Actions** tab and check the **Deploy PropManager to GitHub Pages** workflow. The first deployment may take a few minutes.
+1. Open the repository's **Settings → Pages** and set the **Build and deployment** source to **GitHub Actions**. This one-time repository setting is required before the workflow can publish.
+2. Open the **Actions** tab and run **Deploy PropManager to GitHub Pages** (or push a change to `main`). The deployment may take a few minutes.
 3. Once the deployment succeeds, the Pages settings show the published URL and deployment status.
 
 The expected project-site URL is:
 
 **https://missblac.github.io/PropManager/**
 
-If that address returns 404, check that Pages is enabled with **GitHub Actions** as its source and that the latest workflow run succeeded. Repository visibility or account plan restrictions can also prevent publication. Once published, open the URL in your device browser to use or install PropManager.
+If that address returns 404, check that Pages is enabled with **GitHub Actions** as its source and that the latest workflow run succeeded. The workflow cannot enable Pages automatically because GitHub requires separate repository-administration authorization for that setting. Repository visibility or account plan restrictions can also prevent publication. Once published, open the URL in your device browser to use or install PropManager.
 
 ---
 
