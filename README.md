@@ -83,7 +83,14 @@ Open that URL in Chrome on your phone or computer.
 - Optionally set a 4–6 digit PIN or a password of at least 8 characters in **Settings**. It is requested before **Restore Backup** or **Clear All**; everyday app use and backup export remain available without it.
 - Save the one-time recovery code somewhere separate from the device. If you forget the PIN/password, choose **Forgot PIN/password?**, enter the recovery code, and set a replacement credential and recovery code.
 - The safeguard is stored only in this browser and is not included in backups, so restoring a backup does not replace it. Clearing all records also leaves the safeguard enabled until you turn it off in Settings.
+- Turning off destructive-action protection also turns off app lock because they share the same credential. Turning off only app lock leaves destructive-action protection enabled.
 - This is an offline accidental-action deterrent, not encryption or tamper-proof security. Someone with direct access to browser storage can bypass it. Browser/site-data deletion removes both app data and the safeguard.
+
+## Welcome and App Lock
+- On first use, a short welcome explains offline storage and backups. You can skip it, enable the optional app lock, and reopen the welcome from **Settings**.
+- The optional app lock shares the PIN/password and recovery code above. It adds a **Lock app** button; it locks only when you choose it and stays locked across reloads until unlocked. It does not automatically lock on every app launch.
+- To unlock, enter the PIN/password; use the recovery code if needed. Disabling app lock requires the PIN/password, while destructive-action protection can remain enabled.
+- App access lock is an offline privacy convenience, not encryption or tamper-proof security.
 
 ## Rent Schedules and Reminders
 - Rent schedules list each lease period, amount paid, and remaining balance.

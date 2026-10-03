@@ -47,6 +47,7 @@ body{
   min-height:100vh;
   padding-top:8px;
 }
+body.app-is-locked .app{visibility:hidden}
 a,button{cursor:pointer}
 
 /* ── ADINKRA watermark on main content ── */
@@ -99,6 +100,7 @@ a,button{cursor:pointer}
 .logo-flag{font-size:13px;margin-top:6px;color:rgba(255,255,255,.35);letter-spacing:.3px}
 .nav-label{padding:18px 18px 6px;font-size:10px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.3);text-transform:uppercase}
 .nav-item{display:flex;align-items:center;gap:10px;padding:11px 18px;color:rgba(255,255,255,.65);text-decoration:none;font-size:13.5px;border-left:3px solid transparent;transition:.15s}
+.nav-item.lock-nav{width:100%;background:transparent;border-top:0;border-right:0;border-bottom:0;font-family:inherit;text-align:left;cursor:pointer}
 .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
 .nav-item.active{background:rgba(240,165,0,.13);color:var(--gold);border-left-color:var(--gold)}
 .nav-icon{font-size:16px;width:20px;text-align:center}
@@ -257,6 +259,7 @@ body.dark .ps-item{background:var(--bg)}
   .sidebar{width:100%;height:auto;position:fixed;bottom:0;top:auto;flex-direction:row;overflow-x:auto;overflow-y:hidden;border-top:1px solid rgba(255,255,255,.08);padding:4px 0;height:62px;border-right:none;border-top:3px solid;border-image:repeating-linear-gradient(90deg,var(--gh-green),var(--gh-gold),var(--gh-red)) 1;}
   .logo,.nav-label,.sidebar-bottom{display:none}
   .nav-item{flex-direction:column;gap:2px;padding:6px 10px;font-size:9px;border-left:none;border-top:3px solid transparent;min-width:55px;justify-content:center}
+  .nav-item.lock-nav{width:auto;border-bottom:0}
   .nav-item.active{border-top-color:var(--gold);border-left-color:transparent}
   .nav-badge{display:none}
   .main{margin-left:0;margin-bottom:66px;padding:16px}
@@ -329,6 +332,7 @@ body.dark .ps-item{background:var(--bg)}
   <div class="nav-label">Tools</div>
   <a class="nav-item" data-sec="notes"><span class="nav-icon">📝</span><span>Documents</span></a>
   <a class="nav-item" data-sec="settings"><span class="nav-icon">⚙️</span><span>Settings</span></a>
+  <button class="nav-item" id="app-lock-button" onclick="lockApp()" style="display:none"><span class="nav-icon">🔒</span><span>Lock app</span></button>
   <div class="sidebar-bottom">
     <span class="adinkra">☽ ✦ ☾</span>
     <span class="akwaaba">Akwaaba — You are welcome</span><br>
@@ -507,13 +511,22 @@ body.dark .ps-item{background:var(--bg)}
       </div>
     </div>
     <div class="card">
+      <div class="card-title">App Access</div>
+      <p id="app-lock-status" class="fs13 c-muted" style="margin-bottom:14px">Checking app lock…</p>
+      <div class="row">
+        <button id="app-lock-toggle" class="btn btn-ghost btn-sm" onclick="toggleAppLock()">Enable app lock</button>
+        <button class="btn btn-ghost btn-sm" onclick="showWelcomeIntro()">View welcome intro</button>
+      </div>
+      <small class="c-muted" style="display:block;margin-top:10px">The app lock uses the same PIN/password and recovery code as destructive-action protection. It locks only when you choose Lock app; it does not lock automatically on reload.</small>
+    </div>
+    <div class="card">
       <div class="card-title">Destructive Action Protection</div>
       <p id="safety-status" class="fs13 c-muted" style="margin-bottom:14px">Checking protection status…</p>
       <div class="row">
         <button id="safety-configure" class="btn btn-ghost btn-sm" onclick="manageSafety('change')">Set PIN or password</button>
         <button id="safety-disable" class="btn btn-ghost btn-sm" onclick="manageSafety('disable')" style="display:none">Turn off protection</button>
       </div>
-      <small class="c-muted" style="display:block;margin-top:10px">When enabled, this device asks for your PIN/password before restoring a backup or clearing all data. A recovery code is shown during setup. This offline safeguard helps prevent accidents; it is not encryption and can be bypassed by someone with direct access to browser storage.</small>
+      <small class="c-muted" style="display:block;margin-top:10px">When enabled, this device asks for your PIN/password before restoring a backup or clearing all data. A recovery code is shown during setup. Turning off this protection also turns off the app lock because they share one credential. This offline safeguard helps prevent accidents; it is not encryption and can be bypassed by someone with direct access to browser storage.</small>
     </div>
     <div class="card">
       <div class="card-title">Danger Zone</div>
@@ -731,6 +744,24 @@ body.dark .ps-item{background:var(--bg)}
   </div>
 </div>
 
+<div class="modal-bg" id="m-welcome">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hd"><h3>Welcome to PropManager</h3></div>
+    <div class="modal-body">
+      <p class="fs13" style="margin-bottom:12px">Manage properties, tenants, rent, payments, maintenance and lease documents from one place.</p>
+      <div class="card" style="padding:14px;margin-bottom:14px">
+        <strong>Works offline. Your records stay on this device.</strong>
+        <p class="fs13 c-muted" style="margin-top:6px">Data is stored in this browser, not in an online account. Export backups regularly, especially before changing devices or clearing browser storage.</p>
+      </div>
+      <p id="welcome-lock-note" class="fs13 c-muted" style="margin-bottom:16px"></p>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="finishWelcomeIntro()">Continue without app lock</button>
+        <button id="welcome-lock-button" class="btn btn-gold" onclick="enableAppLockFromWelcome()">Enable app lock</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="m-safety">
   <div class="modal" style="max-width:480px">
     <div class="modal-hd"><h3 id="safety-title">Destructive Action Protection</h3><button class="modal-close" onclick="cancelSafetyFlow()">✕</button></div>
@@ -752,7 +783,7 @@ body.dark .ps-item{background:var(--bg)}
       </div>
       <div class="form-actions">
         <button id="safety-recover-button" type="button" class="btn btn-ghost" onclick="beginSafetyRecovery()" style="display:none">Forgot PIN/password?</button>
-        <button type="button" class="btn btn-ghost" onclick="cancelSafetyFlow()">Cancel</button>
+        <button id="safety-cancel" type="button" class="btn btn-ghost" onclick="cancelSafetyFlow()">Cancel</button>
         <button id="safety-submit" type="submit" class="btn btn-gold">Continue</button>
       </div>
     </form>
@@ -912,6 +943,7 @@ const openMod = id => document.getElementById(id).classList.add('open');
 const closeMod = id => document.getElementById(id).classList.remove('open');
 document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => {
   if(e.target!==m)return;
+  if(m.id==='m-welcome'||(m.id==='m-safety'&&safetyFlow?.target==='app-lock'))return;
   if(m.id==='m-safety')cancelSafetyFlow();
   else m.classList.remove('open');
 }));
@@ -2720,6 +2752,9 @@ async function removeOwnerPhoto() {
 }
 
 const SAFETY_KEY='pm_destructive_guard_v1';
+const APP_LOCK_KEY='pm_app_lock_enabled';
+const APP_LOCKED_KEY='pm_app_locked';
+const INTRO_SEEN_KEY='pm_intro_seen';
 const SAFETY_ITERATIONS=210000;
 let safetyFlow=null;
 function randomHex(bytes=16) {
@@ -2777,6 +2812,87 @@ function refreshSafetyStatus() {
     configure.textContent='Protection unavailable';
     configure.disabled=true;disable.style.display='none';
   }
+  refreshAppAccessStatus();
+}
+function appLockEnabled() {
+  return localStorage.getItem(APP_LOCK_KEY)==='1';
+}
+function refreshAppAccessStatus() {
+  const status=document.getElementById('app-lock-status');
+  if(!status)return;
+  const enabled=appLockEnabled();
+  status.textContent=enabled?'App lock is enabled. Use Lock app in the sidebar whenever you want to protect the screen.':'App lock is off. Enable it to add a manual lock button to the sidebar.';
+  document.getElementById('app-lock-toggle').textContent=enabled?'Disable app lock':'Enable app lock';
+  document.getElementById('app-lock-button').style.display=enabled?'':'none';
+  const welcomeButton=document.getElementById('welcome-lock-button');
+  const welcomeNote=document.getElementById('welcome-lock-note');
+  if(welcomeButton) {
+    welcomeButton.style.display=enabled?'none':'';
+    welcomeNote.textContent=enabled?'Your app lock is already enabled. You can lock the app at any time from the sidebar.':'You can optionally add a manual app lock using your PIN/password. It will not lock automatically when you reopen the app.';
+  }
+}
+function showWelcomeIntro() {
+  refreshAppAccessStatus();
+  openMod('m-welcome');
+}
+function finishWelcomeIntro() {
+  localStorage.setItem(INTRO_SEEN_KEY,'1');
+  closeMod('m-welcome');
+}
+function enableAppLockFromWelcome() {
+  startAppLockEnable(true);
+}
+function toggleAppLock() {
+  startAppLockEnable(false);
+}
+function startAppLockEnable(fromWelcome) {
+  try {
+    const config=readSafetyConfig();
+    if(appLockEnabled()) {
+      if(!fromWelcome) {
+        safetyFlow={target:'app-lock-disable',stage:'authenticate'};
+        setSafetyStage('authenticate');
+      } else finishWelcomeIntro();
+      return;
+    }
+    if(config) {
+      safetyFlow={target:'app-lock-enable',stage:'authenticate',fromWelcome};
+      setSafetyStage('authenticate');
+    } else {
+      safetyFlow={target:'app-lock-setup',stage:'configure',fromWelcome,recoveryCode:''};
+      setSafetyStage('configure','Create a PIN/password and save its recovery code. The same credential protects backup restore and Clear All.');
+    }
+  } catch(error){console.error('Could not configure app access',error);toast(error.message,'err')}
+}
+function lockApp() {
+  if(!appLockEnabled())return;
+  document.querySelectorAll('.modal-bg.open').forEach(modal=>{
+    if(modal.id!=='m-safety'&&modal.id!=='m-app-lock')modal.classList.remove('open');
+  });
+  localStorage.setItem(APP_LOCKED_KEY,'1');
+  document.body.classList.add('app-is-locked');
+  safetyFlow={target:'app-lock',stage:'authenticate'};
+  setSafetyStage('authenticate','Enter your PIN/password to unlock PropManager.');
+}
+function restoreAppAccess() {
+  refreshAppAccessStatus();
+  if(localStorage.getItem(APP_LOCKED_KEY)==='1') {
+    if(!appLockEnabled()) {
+      localStorage.removeItem(APP_LOCKED_KEY);
+      return;
+    }
+    document.body.classList.add('app-is-locked');
+    safetyFlow={target:'app-lock',stage:'authenticate'};
+    try {setSafetyStage('authenticate','Enter your PIN/password to unlock PropManager.')}
+    catch(error) {
+      console.error('Could not open the app lock screen',error);
+      document.getElementById('safety-message').textContent='App lock settings could not be read. Restore browser data or use the recovery process; do not clear app data unless you have a backup.';
+      document.getElementById('safety-cancel').style.display='none';
+      document.getElementById('m-safety').classList.add('open');
+    }
+    return;
+  }
+  if(localStorage.getItem(INTRO_SEEN_KEY)!=='1')showWelcomeIntro();
 }
 function setSafetyStage(stage,message) {
   if(!safetyFlow)return;
@@ -2800,16 +2916,16 @@ function setSafetyStage(stage,message) {
   codeCard.style.display=confirmCode?'':'none';
   recoverButton.style.display=stage==='authenticate'?'':'none';
   document.getElementById('safety-title').textContent=stage==='authenticate'
-    ?(safetyFlow.target==='action'?'Confirm it’s you':safetyFlow.target==='disable'?'Turn off protection':'Change PIN/password')
+    ?(safetyFlow.target==='app-lock'?'Unlock PropManager':safetyFlow.target==='action'?'Confirm it’s you':safetyFlow.target==='app-lock-disable'?'Disable app lock':safetyFlow.target==='app-lock-enable'?'Enable app lock':'Change PIN/password')
     :recovery?'Recover protection':confirmCode?'Save your recovery code':'Set PIN or password';
   document.getElementById('safety-message').textContent=message||(
-    stage==='authenticate'?'Enter your current PIN/password to continue.':
+    stage==='authenticate'?safetyFlow.target==='app-lock'?'Enter your PIN/password to unlock PropManager.':'Enter your current PIN/password to continue.':
     recovery?'Enter your recovery code to set a new PIN/password.':
     confirmCode?'Re-enter the recovery code exactly as shown to finish setup.':
     'Choose a PIN or password. You will need it before restoring a backup or clearing all data.'
   );
   const submit=document.getElementById('safety-submit');
-  submit.textContent=stage==='authenticate'?'Continue':recovery?'Verify recovery code':confirmCode?'Save protection':'Generate recovery code';
+  submit.textContent=stage==='authenticate'?safetyFlow.target==='app-lock'?'Unlock':'Continue':recovery?'Verify recovery code':confirmCode?'Save protection':'Generate recovery code';
   const credential=document.getElementById('safety-credential'),confirm=document.getElementById('safety-confirm');
   const recoveryInput=document.getElementById('safety-recovery'),codeConfirm=document.getElementById('safety-code-confirm');
   credential.required=setup&&!confirmCode||stage==='authenticate';
@@ -2825,6 +2941,9 @@ function setSafetyStage(stage,message) {
   } else {
     updateSafetyCredentialField();
   }
+  const locked=safetyFlow.target==='app-lock';
+  document.getElementById('safety-cancel').style.display=locked?'none':'';
+  document.querySelector('#m-safety .modal-close').style.display=locked?'none':'';
   openMod('m-safety');
   setTimeout(()=>document.getElementById(recovery?'safety-recovery':'safety-credential').focus(),0);
 }
@@ -2861,6 +2980,7 @@ function authorizeDestructiveAction(action) {
 }
 function cancelSafetyFlow() {
   if(!safetyFlow)return;
+  if(safetyFlow.target==='app-lock')return;
   const flow=safetyFlow;safetyFlow=null;
   closeMod('m-safety');
   document.getElementById('safety-code').textContent='';
@@ -2884,7 +3004,23 @@ async function submitSafetyFlow() {
       const actual=await hashSafetySecret(value,config.salt,config.iterations);
       if(!equalSafetySecrets(actual,config.verifier)){toast('Incorrect PIN/password','err');return}
       if(flow.target==='action'){finishSafetyFlow(true);return}
-      if(flow.target==='disable'){localStorage.removeItem(SAFETY_KEY);finishSafetyFlow();refreshSafetyStatus();toast('Destructive-action protection turned off','warn');return}
+      if(flow.target==='app-lock'){finishSafetyFlow(true);return}
+      if(flow.target==='app-lock-enable') {
+        localStorage.setItem(APP_LOCK_KEY,'1');
+        if(flow.fromWelcome)finishWelcomeIntro();
+        finishSafetyFlow();refreshAppAccessStatus();toast('App lock enabled','ok');return;
+      }
+      if(flow.target==='app-lock-disable') {
+        localStorage.removeItem(APP_LOCK_KEY);localStorage.removeItem(APP_LOCKED_KEY);
+        finishSafetyFlow();refreshAppAccessStatus();toast('App lock disabled','warn');return;
+      }
+      if(flow.target==='disable') {
+        localStorage.removeItem(SAFETY_KEY);
+        localStorage.removeItem(APP_LOCK_KEY);localStorage.removeItem(APP_LOCKED_KEY);
+        document.body.classList.remove('app-is-locked');
+        finishSafetyFlow();refreshSafetyStatus();
+        toast('Protection and app lock turned off','warn');return;
+      }
       setSafetyStage('configure');
       return;
     }
@@ -2893,7 +3029,13 @@ async function submitSafetyFlow() {
       const recovery=normalizedRecoveryCode(document.getElementById('safety-recovery').value);
       const actual=await hashSafetySecret(recovery,config.recoverySalt,config.iterations);
       if(!equalSafetySecrets(actual,config.recoveryVerifier)){toast('Recovery code did not match','err');return}
-      if(flow.target==='disable'){localStorage.removeItem(SAFETY_KEY);finishSafetyFlow();refreshSafetyStatus();toast('Protection turned off using the recovery code','warn');return}
+      if(flow.target==='disable') {
+        localStorage.removeItem(SAFETY_KEY);
+        localStorage.removeItem(APP_LOCK_KEY);localStorage.removeItem(APP_LOCKED_KEY);
+        document.body.classList.remove('app-is-locked');
+        finishSafetyFlow();refreshSafetyStatus();
+        toast('Protection and app lock turned off using the recovery code','warn');return;
+      }
       flow.recovered=true;
       setSafetyStage('configure','Recovery accepted. Choose a new PIN/password; a replacement recovery code will be generated.');
       return;
@@ -2919,10 +3061,12 @@ async function submitSafetyFlow() {
       const entered=normalizedRecoveryCode(document.getElementById('safety-code-confirm').value);
       if(!equalSafetySecrets(entered,normalizedRecoveryCode(flow.recoveryCode))){toast('Recovery code did not match. Save and re-enter the code shown above.','err');return}
       localStorage.setItem(SAFETY_KEY,JSON.stringify(flow.pendingConfig));
+      if(flow.target==='app-lock-setup'||flow.target==='app-lock-enable')localStorage.setItem(APP_LOCK_KEY,'1');
+      if(flow.fromWelcome)finishWelcomeIntro();
       const action=flow.target==='action';
-      finishSafetyFlow(action);
+      finishSafetyFlow(action||flow.target==='app-lock');
       refreshSafetyStatus();
-      toast(action?'Protection updated; continuing with the requested action':'Destructive-action protection is enabled','ok');
+      toast(flow.target==='app-lock-setup'?'App lock and destructive-action protection are enabled':action?'Protection updated; continuing with the requested action':'Destructive-action protection is enabled','ok');
     }
   } catch(error){console.error('Could not update or verify destructive-action protection',error);toast(error.message||'Could not verify protection. No destructive action was performed.','err')}
 }
@@ -2930,12 +3074,19 @@ function finishSafetyFlow(result) {
   if(!safetyFlow)return;
   const flow=safetyFlow;safetyFlow=null;
   closeMod('m-safety');
+  if(flow.target==='app-lock'&&result) {
+    localStorage.removeItem(APP_LOCKED_KEY);
+    document.body.classList.remove('app-is-locked');
+    document.getElementById('safety-cancel').style.display='';
+    document.querySelector('#m-safety .modal-close').style.display='';
+  }
   document.getElementById('safety-code').textContent='';
   document.getElementById('safety-credential').value='';
   document.getElementById('safety-confirm').value='';
   document.getElementById('safety-recovery').value='';
   document.getElementById('safety-code-confirm').value='';
   if(flow.resolve)flow.resolve(!!result);
+  refreshAppAccessStatus();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3227,6 +3378,7 @@ function loadDemo() {
   const initialSection=location.hash.slice(1);
   if(renders[initialSection]) nav(initialSection);
   else renderDash();
+  restoreAppAccess();
   // ── Resize: throttled with requestAnimationFrame to prevent jank ──
   let _resizeRaf;
   window.addEventListener('resize', () => {
