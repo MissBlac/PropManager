@@ -69,6 +69,7 @@ If that address returns 404, check that Pages is enabled with **GitHub Actions**
 
 ## Welcome and App Lock
 - On first use, a short welcome explains offline storage and backups, followed by an optional guided tour with plain-language tips for each main section. Move through it with **Next** and **Back**, or use the keyboard arrow keys; skip it or replay it from **App Tour** in the sidebar or **Settings → App Access → Take app tour**.
+- Use **Smart Guide** in the sidebar for built-in offline help, suggested questions and shortcuts to app sections. It answers common how-to questions without sending data online, reading private records or changing anything. It is a help guide, not a general-purpose AI or legal adviser.
 - Reopen the welcome intro from **Settings → App Access → View welcome intro**.
 - The optional app lock shares the PIN/password and recovery code above. It adds a **Lock app** button; it locks only when you choose it and stays locked across reloads until unlocked. It does not automatically lock on every app launch.
 - To unlock, enter the PIN/password; use the recovery code if needed. Disabling app lock requires the PIN/password, while destructive-action protection can remain enabled.

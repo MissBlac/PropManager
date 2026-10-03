@@ -230,6 +230,37 @@ body.dark .tour-footer{background:rgba(15,23,42,.55)}
   .tour-progress span{transition:none}
   .tour-content{animation:none}
 }
+.guide-modal{max-width:600px;max-height:min(720px,92vh);display:flex;flex-direction:column}
+.guide-header{padding:19px 22px;background:linear-gradient(115deg,#102142,#1a2744 66%,#1d523d);color:#fff}
+.guide-header-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.guide-heading{display:flex;align-items:center;gap:11px}
+.guide-mark{display:grid;place-items:center;width:38px;height:38px;flex:none;border-radius:12px;background:linear-gradient(145deg,var(--gh-green),#0b5135);color:#fff;font-size:18px}
+.guide-heading h2{font-size:16px;font-weight:750}
+.guide-heading p{margin-top:3px;color:rgba(255,255,255,.7);font-size:11px}
+.guide-header .modal-close{color:rgba(255,255,255,.8)}
+.guide-header .modal-close:hover{background:rgba(255,255,255,.12);color:#fff}
+.guide-suggestions{display:flex;gap:7px;overflow-x:auto;padding:13px 20px;border-bottom:1px solid var(--border);scrollbar-width:thin}
+.guide-suggestion{flex:none;padding:7px 10px;border-radius:18px;background:var(--bg);color:var(--navy);border:1px solid var(--border);font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.guide-suggestion:hover{border-color:var(--gold);background:rgba(240,165,0,.08)}
+.guide-messages{display:flex;flex-direction:column;gap:12px;min-height:190px;max-height:42vh;overflow-y:auto;padding:20px}
+.guide-message{max-width:90%;padding:11px 13px;border-radius:13px;font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.guide-message.assistant{align-self:flex-start;background:var(--bg);border:1px solid var(--border);color:var(--text);border-top-left-radius:4px}
+.guide-message.user{align-self:flex-end;background:var(--navy);color:#fff;border-top-right-radius:4px}
+.guide-message-action{align-self:flex-start;margin-top:-5px}
+.guide-form{display:flex;align-items:center;gap:8px;padding:13px 16px;border-top:1px solid var(--border);background:var(--card)}
+.guide-form input{flex:1;min-width:0;padding:11px 13px;border:1px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);font:inherit;font-size:13px}
+.guide-form input:focus{outline:2px solid rgba(240,165,0,.45);border-color:var(--gold)}
+.guide-note{padding:0 19px 13px;color:var(--muted);font-size:10px;background:var(--card)}
+body.dark .guide-suggestion{color:var(--text)}
+body.dark .guide-message-action{color:var(--text);background:var(--card)}
+@media(max-width:520px){
+  .guide-modal{max-height:94vh}
+  .guide-header{padding:16px}
+  .guide-suggestions{padding:11px 14px}
+  .guide-messages{padding:16px;max-height:48vh}
+  .guide-form{padding:11px}
+  .guide-note{padding:0 13px 11px}
+}
 
 /* ── ALERTS ── */
 .alert{display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border-radius:9px;font-size:13px;margin-bottom:8px}
@@ -379,6 +410,7 @@ body.dark .ps-item{background:var(--bg)}
   <div class="nav-label">Tools</div>
   <a class="nav-item" data-sec="notes"><span class="nav-icon">📝</span><span>Documents</span></a>
   <button class="nav-item" id="app-tour-button" onclick="startAppTour()" aria-label="Start the guided app tour"><span class="nav-icon">🧭</span><span>App Tour</span></button>
+  <button class="nav-item" id="smart-guide-button" onclick="openSmartGuide()" aria-label="Ask the offline Smart Guide"><span class="nav-icon">💡</span><span>Smart Guide</span></button>
   <a class="nav-item" data-sec="settings"><span class="nav-icon">⚙️</span><span>Settings</span></a>
   <button class="nav-item" id="app-lock-button" onclick="lockApp()" style="display:none"><span class="nav-icon">🔒</span><span>Lock app</span></button>
   <div class="sidebar-bottom">
@@ -847,6 +879,32 @@ body.dark .ps-item{background:var(--bg)}
   </div>
 </div>
 
+<div class="modal-bg" id="m-guide" role="dialog" aria-modal="true" aria-labelledby="guide-title">
+  <div class="modal guide-modal">
+    <div class="guide-header">
+      <div class="guide-header-row">
+        <div class="guide-heading">
+          <span class="guide-mark" aria-hidden="true">💡</span>
+          <div><h2 id="guide-title">Smart Guide</h2><p>Quick answers for using PropManager</p></div>
+        </div>
+        <button class="modal-close" aria-label="Close Smart Guide" onclick="closeMod('m-guide')">✕</button>
+      </div>
+    </div>
+    <div class="guide-suggestions" aria-label="Suggested questions">
+      <button type="button" class="guide-suggestion" onclick="askGuide('How do I add a property?')">Add a property</button>
+      <button type="button" class="guide-suggestion" onclick="askGuide('How do I record rent?')">Record rent</button>
+      <button type="button" class="guide-suggestion" onclick="askGuide('How do backups work?')">Backups</button>
+      <button type="button" class="guide-suggestion" onclick="askGuide('How do I create a lease agreement?')">Lease agreement</button>
+    </div>
+    <div id="guide-messages" class="guide-messages" role="log" aria-live="polite" aria-relevant="additions text"></div>
+    <form class="guide-form" onsubmit="event.preventDefault();submitGuideQuestion()">
+      <input id="guide-input" type="text" maxlength="240" placeholder="Ask how to use the app…" autocomplete="off" aria-label="Ask the Smart Guide">
+      <button class="btn btn-gold" type="submit">Ask</button>
+    </form>
+    <p class="guide-note">Works offline with built-in help. It does not change your records or provide legal advice.</p>
+  </div>
+</div>
+
 <div class="modal-bg" id="m-safety">
   <div class="modal" style="max-width:480px">
     <div class="modal-hd"><h3 id="safety-title">Destructive Action Protection</h3><button class="modal-close" onclick="cancelSafetyFlow()">✕</button></div>
@@ -1033,6 +1091,7 @@ const openMod = id => document.getElementById(id).classList.add('open');
 const closeMod = id => document.getElementById(id).classList.remove('open');
 document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => {
   if(e.target!==m)return;
+  if(m.id==='m-guide'){closeMod('m-guide');return}
   if(m.id==='m-tour'){finishAppTour();return}
   if(m.id==='m-welcome'||(m.id==='m-safety'&&safetyFlow?.target==='app-lock'))return;
   if(m.id==='m-safety')cancelSafetyFlow();
@@ -1048,6 +1107,77 @@ function toast(msg, type='info') {
   const el  = Object.assign(document.createElement('div'), { className:'toast ' + (cls[type]||'t-info'), textContent: (ic[type]||ic.info)+' '+msg });
   document.getElementById('toasts').appendChild(el);
   setTimeout(() => el.remove(), 3400);
+}
+
+const GUIDE_TOPICS=[
+  {keywords:['property','properties','building','unit','add property'],answer:'Open Properties and choose “Add Property.” Enter the property name and address, then save. You can add tenants to it afterward.',section:'properties',label:'Go to Properties'},
+  {keywords:['tenant','tenants','resident','add tenant'],answer:'Open Tenants and choose “Add Tenant.” Fill in their contact, rent, unit and lease details, then choose the property they live in.',section:'tenants',label:'Go to Tenants'},
+  {keywords:['record rent','record payment','payment','paid','rent','arrears','overdue','balance','lease balance','rent schedule'],answer:'Open Rent Tracker to see the latest balances. To add a payment, choose “Record Payment,” select the tenant, enter the amount, date and method, then save. I can explain the steps, but I do not read your private records.',section:'rent',label:'Open Rent Tracker'},
+  {keywords:['reminder','reminders','alerts','need alerts','upcoming alerts','due date','lease ending','upcoming','automatic reminder'],answer:'Open Reminders to check upcoming rent and lease dates. These reminders are calculated when you open the app; they are not guaranteed while it is closed.',section:'reminders',label:'View Reminders'},
+  {keywords:['expense','expenses','cost','bill','vendor'],answer:'Open Expenses and choose “Add Expense.” Select the property, enter the type, amount and date, then save. Expenses are included in your reports.',section:'expenses',label:'Go to Expenses'},
+  {keywords:['maintenance','repair','repairs','contractor','job'],answer:'Open Maintenance and choose “Log Job.” Add the property, issue, priority and status. You can update the job as work progresses.',section:'maintenance',label:'Open Maintenance'},
+  {keywords:['report','reports','profit','income','collection rate','csv','export csv'],answer:'Open Reports to review income, expenses, net profit and collection rates. Choose a year, then export a CSV or print the report.',section:'reports',label:'Open Reports'},
+  {keywords:['agreement','lease agreement','sign','signature','signed document','pdf','document','documents','letter','note'],answer:'Open Documents to write a note, create a lease agreement for on-screen signing, or import a signed PDF or photo. Saved files stay on this device and are included in backups. An on-screen signature does not verify identity or legal validity.',section:'notes',label:'Open Documents'},
+  {keywords:['backup','backups','restore','transfer','new phone','new device','export data','move data'],answer:'In Settings → Data Backup & Restore, choose Export Backup and keep the file somewhere safe. On the other device, open the same screen and import that file. Your data is stored separately in each browser until you transfer a backup.',section:'settings',label:'Open Backup Settings'},
+  {keywords:['offline','internet','online','private','privacy','stored','storage','data'],answer:'PropManager works offline and stores your records in this browser on this device. Data is not synced to an online account. Export a backup regularly, especially before changing devices or clearing browser data.',section:'settings',label:'View Settings'},
+  {keywords:['pin','password','forgot password','recovery code','app lock','lock app','protection'],answer:'In Settings, App Access lets you enable the optional manual app lock. Destructive Action Protection can guard Clear All and backup restore. Save the one-time recovery code separately. This is a convenience safeguard, not encryption.',section:'settings',label:'Open Security Settings'},
+  {keywords:['dark mode','wallpaper','appearance','photo','profile','business name','currency','settings'],answer:'Open Settings to update your business profile, currency, owner photo, wallpaper and appearance. Choose Save Settings after changing your business details.',section:'settings',label:'Open Settings'},
+  {keywords:['legal advice','law','legal','court','evict','eviction','rent control','legal notice','legally'],answer:'The app can help store documents and provide templates, but it cannot give legal advice or confirm that a notice meets current local law. Please check with a qualified local professional before acting.',section:'notes',label:'View Documents',priority:10},
+  {keywords:['tour','walkthrough','navigate','navigation','where is','how to use'],answer:'The App Tour walks through the dashboard and each main section. Choose App Tour in the sidebar to start it again.',section:null,label:''}
+];
+function addGuideMessage(text,role='assistant') {
+  const messages=document.getElementById('guide-messages');
+  const message=document.createElement('div');
+  message.className=`guide-message ${role}`;
+  message.textContent=text;
+  messages.appendChild(message);
+  messages.scrollTop=messages.scrollHeight;
+  return message;
+}
+function findGuideTopic(question) {
+  const query=String(question||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  let best=null,bestScore=0;
+  for(const topic of GUIDE_TOPICS) {
+    let score=0;
+    for(const keyword of topic.keywords) {
+      const escaped=keyword.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      if(new RegExp(`(?:^| )${escaped}(?: |$)`).test(query))score+=keyword.includes(' ')?5:2;
+    }
+    if(score)score+=topic.priority||0;
+    if(score>bestScore){best=topic;bestScore=score}
+  }
+  return best;
+}
+function askGuide(question) {
+  const value=String(question||'').trim();
+  if(!value)return;
+  addGuideMessage(value,'user');
+  const topic=findGuideTopic(value);
+  const answer=topic?.answer||'I don’t know that one yet. Try asking about adding a property or tenant, recording rent, reminders, expenses, maintenance, reports, documents, backups or app security.';
+  addGuideMessage(answer);
+  if(topic?.section) {
+    const action=document.createElement('button');
+    action.type='button';
+    action.className='btn btn-ghost btn-sm guide-message-action';
+    action.textContent=topic.label;
+    action.addEventListener('click',()=>{closeMod('m-guide');nav(topic.section)});
+    document.getElementById('guide-messages').appendChild(action);
+    document.getElementById('guide-messages').scrollTop=document.getElementById('guide-messages').scrollHeight;
+  }
+}
+function submitGuideQuestion() {
+  const input=document.getElementById('guide-input');
+  const question=input.value.trim();
+  if(!question)return;
+  input.value='';
+  askGuide(question);
+}
+function openSmartGuide() {
+  const messages=document.getElementById('guide-messages');
+  messages.replaceChildren();
+  addGuideMessage('Hi! I’m the offline Smart Guide. Ask me how to use a feature, or tap one of the suggested questions above.');
+  openMod('m-guide');
+  document.getElementById('guide-input').focus();
 }
 
 // ═══════════════════════════════════════════════════════════
