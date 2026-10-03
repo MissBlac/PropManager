@@ -67,7 +67,7 @@ If that address returns 404, check that Pages is enabled with **GitHub Actions**
 - This is an offline accidental-action deterrent, not encryption or tamper-proof security. Someone with direct access to browser storage can bypass it. Browser/site-data deletion removes both app data and the safeguard.
 
 ## Welcome and App Lock
-- On first use, a short welcome explains offline storage and backups, followed by an optional guided tour of the dashboard and each main section. The tour can be skipped and replayed from **Settings → App Access → Take app tour**.
+- On first use, a short welcome explains offline storage and backups, followed by an optional guided tour of the dashboard and each main section. The tour can be skipped and replayed from **App Tour** in the sidebar or **Settings → App Access → Take app tour**.
 - Reopen the welcome intro from **Settings → App Access → View welcome intro**.
 - The optional app lock shares the PIN/password and recovery code above. It adds a **Lock app** button; it locks only when you choose it and stays locked across reloads until unlocked. It does not automatically lock on every app launch.
 - To unlock, enter the PIN/password; use the recovery code if needed. Disabling app lock requires the PIN/password, while destructive-action protection can remain enabled.

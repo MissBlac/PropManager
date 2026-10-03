@@ -335,6 +335,7 @@ body.dark .ps-item{background:var(--bg)}
   <a class="nav-item" data-sec="reports"><span class="nav-icon">📈</span><span>Reports</span></a>
   <div class="nav-label">Tools</div>
   <a class="nav-item" data-sec="notes"><span class="nav-icon">📝</span><span>Documents</span></a>
+  <button class="nav-item" id="app-tour-button" onclick="startAppTour()" aria-label="Start the guided app tour"><span class="nav-icon">🧭</span><span>App Tour</span></button>
   <a class="nav-item" data-sec="settings"><span class="nav-icon">⚙️</span><span>Settings</span></a>
   <button class="nav-item" id="app-lock-button" onclick="lockApp()" style="display:none"><span class="nav-icon">🔒</span><span>Lock app</span></button>
   <div class="sidebar-bottom">
@@ -963,7 +964,7 @@ function nav(sec) {
     if(index>=0)renderAppTourStep(index);
   }
 }
-document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => nav(n.dataset.sec)));
+document.querySelectorAll('.nav-item[data-sec]').forEach(n => n.addEventListener('click', () => nav(n.dataset.sec)));
 
 // ═══════════════════════════════════════════════════════════
 // MODALS
