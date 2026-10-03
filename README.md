@@ -55,6 +55,7 @@ If that address returns 404, check that Pages is enabled with **GitHub Actions**
 
 ## Profiles and Appearance
 - Add an owner photo and contact details in **Settings**, plus an optional tenant photo on each tenant record. Your Business / Landlord Name appears as the owner signature in the app sidebar and welcome screen.
+- The app credits its creator brand as **PropManager by MissBlac** in the sidebar and **Settings → About PropManager**, where the published app address is linked. This is separate from the landlord’s own business signature.
 - Choose an optional app wallpaper and adjust its visibility; reset it any time to return to the default background.
 - Photos and wallpaper are compressed and stored offline in this browser. Backup/restore includes them with saved documents, so use a fresh backup to transfer them to another device.
 - Images and records remain device/browser-specific until you export and restore a backup. Clearing browser storage removes the local copies.
