@@ -54,7 +54,7 @@ If that address returns 404, check that Pages is enabled with **GitHub Actions**
 - Browser storage can be cleared by the browser/device. A backup is the way to move or recover your data on another device.
 
 ## Profiles and Appearance
-- Add an owner photo and contact details in **Settings**, plus an optional tenant photo on each tenant record.
+- Add an owner photo and contact details in **Settings**, plus an optional tenant photo on each tenant record. Your Business / Landlord Name appears as the owner signature in the app sidebar and welcome screen.
 - Choose an optional app wallpaper and adjust its visibility; reset it any time to return to the default background.
 - Photos and wallpaper are compressed and stored offline in this browser. Backup/restore includes them with saved documents, so use a fresh backup to transfer them to another device.
 - Images and records remain device/browser-specific until you export and restore a backup. Clearing browser storage removes the local copies.
