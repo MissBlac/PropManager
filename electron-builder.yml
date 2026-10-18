@@ -1,0 +1,50 @@
+appId: com.missblac.propmanager
+productName: PropManager
+copyright: Copyright © 2026 MissBlac
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - index.html
+  - index.js
+  - manifest.json
+  - sw.js
+  - icon.svg
+  - icon-192.png
+  - icon-512.png
+  - electron/**
+
+mac:
+  category: public.app-category.business
+  icon: build/icon.icns
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+win:
+  icon: build/icon.ico
+  target:
+    - nsis
+    - zip
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+linux:
+  category: Business
+  icon: build/icon.png
+  maintainer: MissBlac <missblac@users.noreply.github.com>
+  desktop:
+    Name: PropManager
+    Comment: Offline landlord property management — built for Ghana
+  target:
+    - AppImage
+    - deb

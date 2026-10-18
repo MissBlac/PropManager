@@ -1,0 +1,13 @@
+node_modules/
+dist/
+out/
+
+# Android / TWA build outputs
+twa/app/build/
+twa/.gradle/
+twa/.idea/
+twa/build/
+twa/local.properties
+twa/capture/java_exceptions/
+npm-debug.log*
+.DS_Store

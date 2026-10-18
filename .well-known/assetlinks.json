@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.missblac.propmanager",
+    "sha256_cert_fingerprints": ["DC:E9:6D:8C:07:4E:BB:10:E4:13:D9:87:5A:D4:78:87:96:6B:31:B2:E1:8D:C3:BB:22:C6:B1:D4:33:50:2E:33"]
+  }
+}]

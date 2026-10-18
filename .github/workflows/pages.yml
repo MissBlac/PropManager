@@ -28,6 +28,7 @@ jobs:
         run: |
           mkdir public
           cp index.html manifest.json sw.js icon.svg icon-192.png icon-512.png public/
+          cp -r .well-known public/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

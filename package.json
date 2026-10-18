@@ -1,0 +1,21 @@
+{
+  "name": "propmanager",
+  "productName": "PropManager",
+  "version": "1.0.0",
+  "description": "Offline landlord property management app — built for Ghana",
+  "author": "MissBlac",
+  "license": "UNLICENSED",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
+  },
+  "devDependencies": {
+    "@bubblewrap/cli": "^1.27.0",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}
