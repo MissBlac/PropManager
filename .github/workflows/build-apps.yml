@@ -87,16 +87,11 @@ jobs:
           mkdir -p ~/.bubblewrap
           ln -sf "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" "$ANDROID_SDK_ROOT/bin"
           ln -sf "$ANDROID_SDK_ROOT/cmdline-tools/latest/lib" "$ANDROID_SDK_ROOT/lib"
-          cat > ~/.bubblewrap/config.json <<EOF
-          {
-            "jdkPath": "$JAVA_HOME",
-            "androidSdkPath": "$ANDROID_SDK_ROOT",
-            "adbPath": "$ANDROID_SDK_ROOT/platform-tools/adb"
-          }
-          EOF
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          printf '%s' "{\"jdkPath\": \"$JAVA_HOME\", \"androidSdkPath\": \"$ANDROID_SDK_ROOT\", \"adbPath\": \"$ANDROID_SDK_ROOT/platform-tools/adb\"}" > ~/.bubblewrap/config.json
 
       - name: Install required SDK components
-        run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;36.1.0"
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;36.1.0"'
 
       - name: Stamp version
         if: ${{ inputs.version != '' }}
@@ -109,10 +104,12 @@ jobs:
                  twa/twa-manifest.json
 
       - name: Always raise the Android version code
-        run: sed -i "s/\"appVersionCode\": [0-9]*/\"appVersionCode\": ${{ github.run_number }}/" twa-manifest.json
+        run: |-
+          sed -i "s/\"appVersionCode\": [0-9]*/\"appVersionCode\": ${{ github.run_number }}/" twa-manifest.json
 
       - name: Refresh manifest checksum
-        run: sha1sum twa-manifest.json | cut -d' ' -f1 | tr -d '\n' > manifest-checksum.txt
+        run: |-
+          sha1sum twa-manifest.json | cut -d' ' -f1 | tr -d '\n' > manifest-checksum.txt
 
       - name: Build signed APK
         env:
