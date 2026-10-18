@@ -17,7 +17,7 @@ env:
   CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   desktop:
@@ -58,8 +58,42 @@ jobs:
             dist/*.zip
           if-no-files-found: error
 
-  android:
-    name: Android APK
+  release:
+    name: Publish GitHub Release
+    needs: [desktop, android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Collect all build outputs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: PropManager-*
+          merge-multiple: true
+          path: release
+
+      - name: Give the APK a friendly name
+        run: mv release/app-release-signed.apk release/PropManager.apk || true
+
+      - name: Publish to the 'latest' release page
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |-
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest release/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create latest release/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "PropManager — latest installable apps" \
+              --latest \
+              --notes "Installable apps built automatically from main.
+          - Windows: PropManager-Setup-*.exe (installer) or .zip (portable)
+          - macOS: .dmg (Apple Silicon arm64 + Intel x64)
+          - Linux: .AppImage or .deb
+          - Android: PropManager.apk"
+          fi
+          gh release view latest --repo "$GITHUB_REPOSITORY"
     runs-on: ubuntu-latest
     defaults:
       run:
