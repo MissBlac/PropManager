@@ -9,5 +9,7 @@ twa/.idea/
 twa/build/
 twa/local.properties
 twa/capture/java_exceptions/
+twa/app-release-*
+twa/*.aab*.idsig
 npm-debug.log*
 .DS_Store

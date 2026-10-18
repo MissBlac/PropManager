@@ -106,6 +106,9 @@ jobs:
       - name: Always raise the Android version code
         run: sed -i "s/\"appVersionCode\": [0-9]*/\"appVersionCode\": ${{ github.run_number }}/" twa-manifest.json
 
+      - name: Refresh manifest checksum
+        run: sha1sum twa-manifest.json | cut -d' ' -f1 | tr -d '\n' > manifest-checksum.txt
+
       - name: Build signed APK
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
