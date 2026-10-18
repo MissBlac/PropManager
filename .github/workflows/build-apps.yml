@@ -80,7 +80,7 @@ jobs:
           node-version: 22
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        run: echo "Using the Android SDK preinstalled on the runner at $ANDROID_SDK_ROOT"
 
       - name: Write Bubblewrap environment config
         run: |
@@ -91,7 +91,14 @@ jobs:
           printf '%s' "{\"jdkPath\": \"$JAVA_HOME\", \"androidSdkPath\": \"$ANDROID_SDK_ROOT\", \"adbPath\": \"$ANDROID_SDK_ROOT/platform-tools/adb\"}" > ~/.bubblewrap/config.json
 
       - name: Install required SDK components
-        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;36.1.0"'
+        run: |-
+          if [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          else
+            SM="$(command -v sdkmanager)"
+          fi
+          yes | "$SM" --licenses >/dev/null 2>&1 || true
+          "$SM" --install "platforms;android-36" "build-tools;36.1.0"
 
       - name: Stamp version
         if: ${{ inputs.version != '' }}
