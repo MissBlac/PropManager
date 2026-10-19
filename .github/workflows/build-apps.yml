@@ -143,10 +143,12 @@ jobs:
           sed -i -e "s/\"appVersionName\": \"[^\"]*\"/\"appVersionName\": \"$V\"/" \
                  -e "s/\"appVersion\": \"[^\"]*\"/\"appVersion\": \"$V\"/" \
                  twa/twa-manifest.json
+          sed -i "s/versionName \"[^\"]*\"/versionName \"$V\"/" twa/app/build.gradle
 
       - name: Always raise the Android version code
         run: |-
           sed -i "s/\"appVersionCode\": [0-9]*/\"appVersionCode\": ${{ github.run_number }}/" twa-manifest.json
+          sed -i "s/versionCode [0-9][0-9]*/versionCode ${{ github.run_number }}/" app/build.gradle
 
       - name: Refresh manifest checksum
         run: |-
