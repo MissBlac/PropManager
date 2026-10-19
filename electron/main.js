@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, session, shell } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
@@ -39,6 +39,13 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Desktop notifications: allow web notifications, and give Windows a proper toast identity.
+  app.setAppUserModelId('com.missblac.propmanager');
+  const allowedPermissions = new Set(['notifications', 'fullscreen', 'clipboard-sanitized-write']);
+  session.defaultSession.setPermissionRequestHandler((wc, permission, callback) => {
+    callback(allowedPermissions.has(permission));
+  });
+
   createWindow();
 
   app.on('activate', () => {

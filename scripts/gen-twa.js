@@ -31,7 +31,7 @@ async function main() {
   twaManifest.signingKey.path = '../signing/propmanager.jks';
   twaManifest.signingKey.alias = 'propmanager';
   twaManifest.shortcuts = [];                            // Web shortcuts use SVG icons; skip on Android
-  twaManifest.enableNotifications = false;               // Manual notifications only, as in the web app
+  twaManifest.enableNotifications = true;                // Delegated web notification support (POST_NOTIFICATIONS + DelegationService)
   if (!/^.*\.(png|jpg|jpeg|webp)$/.test(twaManifest.iconUrl || '')) {
     twaManifest.iconUrl = `${APP_URL}/icon-512.png`;
   }

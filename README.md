@@ -83,7 +83,9 @@ If that address returns 404, check that Pages is enabled with **GitHub Actions**
 - Rent schedules list each lease period, amount paid, and remaining balance.
 - Payments can be allocated to a selected period or automatically applied oldest-first.
 - Record rent changes with their effective date; schedules and reports use the saved rate history.
-- Rent and lease reminders are calculated on this device whenever the app is opened. Browsers cannot guarantee scheduled alerts while the app is closed without an online service.
+- Rent and lease reminders are calculated on this device whenever the app is opened. Pop-up reminders that ring are shown while the app is open — enable them once on the Reminders page ("Enable pop-up alerts"). The installed Android app and the desktop apps deliver the ring and pop-up as system notifications.
+- Within 7 days of a due date (and for leases ending within 30 days), every reminder has a ready-made, editable message you can copy for SMS or open directly in WhatsApp — it politely asks the tenant to confirm they know the rent is due and whether they plan to continue the tenancy.
+- Browsers cannot guarantee scheduled alerts while the app is closed without an online service.
 
 ## Agreements and Sharing
 - Create a lease agreement from a tenant record and collect signatures on screen, or import an externally signed PDF/photo.

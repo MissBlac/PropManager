@@ -16,6 +16,10 @@ on:
       - index.js
       - sw.js
       - manifest.json
+      - electron/**
+      - electron-builder.yml
+      - twa/**
+      - scripts/gen-twa.js
 
 env:
   CSC_IDENTITY_AUTO_DISCOVERY: "false"

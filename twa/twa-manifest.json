@@ -11,7 +11,7 @@
   "navigationDividerColor": "#000000",
   "navigationDividerColorDark": "#000000",
   "backgroundColor": "#1A2744",
-  "enableNotifications": false,
+  "enableNotifications": true,
   "startUrl": "/PropManager/index.html",
   "iconUrl": "https://missblac.github.io/PropManager/icon-512.png",
   "maskableIconUrl": "https://missblac.github.io/PropManager/icon-512.png",
