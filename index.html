@@ -2301,7 +2301,7 @@ function renderRem() {
       const safeName=escapeHtml(t.name);
       const safeProp=escapeHtml(propName(t.propertyId));
       const next=t.upcomingPeriods[0];
-      return `<tr><td class="fw7">${safeName}</td><td>${safeProp}</td><td>${c} ${fmt(next.balance)} remaining for ${escapeHtml(fmtD(next.start))}${days(td,next.due)===0?' <span class="badge b-warn">due today</span>':''}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">Record Payment</button><button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="pmMsgTenant(${inlineArg(t.id)},'upcoming')">💬 Message</button></td></tr>`;
+      return `<tr><td class="fw7">${safeName}</td><td>${safeProp}</td><td>${c} ${fmt(next.balance)} remaining for ${escapeHtml(fmtD(next.start))}${days(todayDate,next.due)===0?' <span class="badge b-warn">due today</span>':''}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">Record Payment</button><button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="pmMsgTenant(${inlineArg(t.id)},'upcoming')">💬 Message</button></td></tr>`;
     })+
     section('Leases Expiring Within 30 Days','📋','var(--navy)',expiring, t=>{
       const safeName=escapeHtml(t.name);
