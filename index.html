@@ -1452,6 +1452,29 @@ function dueSoon(t) {
   const lastDay=new Date(todayStart.getFullYear(),todayStart.getMonth(),todayStart.getDate()+7);
   return rentPeriods(t).some(period=>period.balance>0&&period.due>=todayStart&&period.due<=lastDay);
 }
+// A tenant is LATE only when a payment date has already passed: rent that is due
+// today counts as a "heads-up", keeping Dashboard, Reminders and pop-up alerts
+// consistent with each other.
+function lateRentBalance(t) {
+  const todayStart=new Date(); todayStart.setHours(0,0,0,0);
+  return rentPeriods(t).filter(period=>period.balance>0&&period.due<todayStart).reduce((s,p)=>s+p.balance,0);
+}
+function dueTodayLabel(t) {
+  const todayStart=new Date(); todayStart.setHours(0,0,0,0);
+  return rentPeriods(t).some(p=>p.balance>0&&p.due.getTime()===todayStart.getTime());
+}
+function updateNavBadges() {
+  const tens=load(K.tens).filter(t=>t.status==='Active');
+  const now=new Date(); const td=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  let count=0;
+  tens.forEach(t=>{
+    if(lateRentBalance(t)>0) count++;
+    else if(dueSoon(t)) count++;
+    const leaseEnd=parseLocalDate(t.leaseEnd);
+    if(leaseEnd){ const d=days(td,leaseEnd); if(d>=0&&d<=30) count++ }
+  });
+  ['nb-dash','nb-rem'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.textContent=count; el.style.display=count?'':'none' } });
+}
 
 function fillPropDrops() {
   const opts = load(K.props).map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join('') || '<option value="">— Add a property first —</option>';
@@ -1474,7 +1497,7 @@ function renderDash() {
   const mExps = exps.filter(e => { const d=dateValue(e.date); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear() });
   const mInc  = mPays.reduce((s,p)=>s+Number(p.amount),0);
   const mExp  = mExps.reduce((s,e)=>s+Number(e.amount),0);
-  let overdue = 0; tens.forEach(t => { if (tenStatus(t).balance > 0) overdue++ });
+  let overdue = 0; tens.forEach(t => { if (lateRentBalance(t) > 0) overdue++ });
 
   document.getElementById('dash-stats').innerHTML = `
     <div class="stat-card"><div class="stat-ic ic-navy">🏠</div><div><div class="stat-val">${props.length}</div><div class="stat-lbl">Properties</div></div></div>
@@ -1486,15 +1509,14 @@ function renderDash() {
   // Alerts
   let alerts = [], count = 0;
   tens.forEach(t => {
-    const { balance } = tenStatus(t);
+    const late = lateRentBalance(t);
     const name=escapeHtml(t.name);
     const property=escapeHtml(propName(t.propertyId));
-    if (balance > 0) { alerts.push(`<div class="alert alert-red">⚠ <strong>${name}</strong> (${property}) — <strong>${c} ${fmt(balance)}</strong> overdue</div>`); count++ }
-    else if (dueSoon(t)) { alerts.push(`<div class="alert alert-warn">🔔 <strong>${name}</strong>'s rent is due within 7 days</div>`); count++ }
+    if (late > 0) { alerts.push(`<div class="alert alert-red">⚠ <strong>${name}</strong> (${property}) — <strong>${c} ${fmt(late)}</strong> overdue</div>`); count++ }
+    else if (dueSoon(t)) { const dl=dueSoon(t)&&dueTodayLabel(t) ? 'due today' : 'due within 7 days'; alerts.push(`<div class="alert alert-warn">🔔 <strong>${name}</strong>'s rent is ${dl}</div>`); count++ }
     if (t.leaseEnd) { const d=days(now,t.leaseEnd); if(d>=0&&d<=30){ alerts.push(`<div class="alert alert-blue">📋 <strong>${name}</strong>'s lease expires in <strong>${d} day(s)</strong> — ${fmtD(t.leaseEnd)}</div>`); count++ } }
   });
-  document.getElementById('nb-dash').textContent = count; document.getElementById('nb-dash').style.display = count ? '' : 'none';
-  document.getElementById('nb-rem').textContent  = count; document.getElementById('nb-rem').style.display  = count ? '' : 'none';
+  updateNavBadges();
   document.getElementById('dash-alerts').innerHTML = alerts.length ? alerts.join('') : '<div class="alert alert-green">✓ All accounts are in good standing</div>';
   updateSetupChecklist();
   updateBackupStatus();
@@ -2242,8 +2264,8 @@ function renderRem() {
   tens.forEach(t => {
     const schedule=rentPeriods(t);
     const todayDate=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-    const late=schedule.filter(period=>period.balance>0&&period.due<=todayDate);
-    const upcoming=schedule.filter(period=>period.balance>0&&period.due>todayDate&&period.due<=new Date(todayDate.getFullYear(),todayDate.getMonth(),todayDate.getDate()+7));
+    const late=schedule.filter(period=>period.balance>0&&period.due<todayDate);
+    const upcoming=schedule.filter(period=>period.balance>0&&period.due>=todayDate&&period.due<=new Date(todayDate.getFullYear(),todayDate.getMonth(),todayDate.getDate()+7));
     if(late.length) overdue.push({...t,latePeriods:late,lateBalance:late.reduce((sum,period)=>sum+period.balance,0)});
     if(upcoming.length) soon.push({...t,upcomingPeriods:upcoming});
     const leaseEnd=parseLocalDate(t.leaseEnd); const dLeft=leaseEnd?days(todayDate,leaseEnd):null;
@@ -2279,7 +2301,7 @@ function renderRem() {
       const safeName=escapeHtml(t.name);
       const safeProp=escapeHtml(propName(t.propertyId));
       const next=t.upcomingPeriods[0];
-      return `<tr><td class="fw7">${safeName}</td><td>${safeProp}</td><td>${c} ${fmt(next.balance)} remaining for ${escapeHtml(fmtD(next.start))}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">Record Payment</button><button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="pmMsgTenant(${inlineArg(t.id)},'upcoming')">💬 Message</button></td></tr>`;
+      return `<tr><td class="fw7">${safeName}</td><td>${safeProp}</td><td>${c} ${fmt(next.balance)} remaining for ${escapeHtml(fmtD(next.start))}${days(td,next.due)===0?' <span class="badge b-warn">due today</span>':''}</td><td><button class="btn btn-gold btn-sm" onclick="openPayModal(${inlineArg(t.id)})">Record Payment</button><button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="pmMsgTenant(${inlineArg(t.id)},'upcoming')">💬 Message</button></td></tr>`;
     })+
     section('Leases Expiring Within 30 Days','📋','var(--navy)',expiring, t=>{
       const safeName=escapeHtml(t.name);
@@ -4115,6 +4137,7 @@ function loadDemo() {
   if(renders[initialSection]) nav(initialSection);
   else renderDash();
   restoreAppAccess();
+  updateNavBadges();
   // Pop-up alerts: check shortly after open and again whenever the app returns to view.
   if(('Notification' in window)&&Notification.permission==='granted') setTimeout(()=>pmCheckNotifs(),1200);
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') setTimeout(()=>pmCheckNotifs(),400) });
