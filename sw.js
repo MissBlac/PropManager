@@ -46,11 +46,14 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(request)
         .then(response => {
-          if (response.ok && response.type !== 'opaque') {
-            const cacheWrite = caches.open(CACHE_NAME)
-              .then(cache => cache.put(APP_SHELL_URL, response.clone()));
-            event.waitUntil(cacheWrite);
+          // A gateway or captive portal can ANSWER with a bad status instead of
+          // failing the fetch. Any not-good response falls back to the cached shell.
+          if (!response.ok || response.type === 'opaque') {
+            return caches.match(APP_SHELL_URL, { cacheName: CACHE_NAME }).then(cached => cached || response);
           }
+          const cacheWrite = caches.open(CACHE_NAME)
+            .then(cache => cache.put(APP_SHELL_URL, response.clone()));
+          event.waitUntil(cacheWrite);
           return response;
         })
         .catch(async () => {
