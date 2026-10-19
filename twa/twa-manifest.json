@@ -20,7 +20,7 @@
     "path": "../signing/propmanager.jks",
     "alias": "propmanager"
   },
-  "appVersionName": "1.1.0",
+  "appVersionName": "1.2.0",
   "appVersionCode": 1,
   "shortcuts": [],
   "generatorApp": "unknown",
@@ -43,5 +43,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "1.1.0"
+  "appVersion": "1.2.0"
 }

@@ -85,6 +85,10 @@ If that address returns 404, check that Pages is enabled with **GitHub Actions**
 - Record rent changes with their effective date; schedules and reports use the saved rate history.
 - Rent and lease reminders are calculated on this device whenever the app is opened. Pop-up reminders that ring are shown while the app is open — enable them once on the Reminders page ("Enable pop-up alerts"). The installed Android app and the desktop apps deliver the ring and pop-up as system notifications, played with your chosen chime (Settings → Alert Sound: Gold Chime, Kente Bell, Adinkra Beat, Soft Pulse, Sharp Beep — or your device's default sound). Overdue alerts ring in a slightly deeper, faster voice than the 7-day heads-up.
 - Within 7 days of a due date (and for leases ending within 30 days), every reminder has a ready-made, editable message you can copy for SMS or open directly in WhatsApp — it politely asks the tenant to confirm they know the rent is due and whether they plan to continue the tenancy.
+- Water and electricity can be tracked as their own monthly ledger, separate from rent (so prepaid rent never absorbs utility money). Each tenant can be set to pay the provider directly (their own meter) or a fixed monthly fee to the landlord (shared meter). Unpaid bills appear on the Reminders page and Dashboard, can be marked paid with a MoMo reference, and are included in the printable statement.
+- Each tenant has a printable statement (rent schedule, utility bills, payments, MoMo references) you can print or save as PDF to share with tenants or landlords.
+- Contracts, receipts and scans can be attached to a tenant record; they stay on the device and travel inside backups.
+- The app quietly offers to refresh when a new version is live, so everyone picks up fixes without reinstalling.
 - Browsers cannot guarantee scheduled alerts while the app is closed without an online service.
 
 ## Agreements and Sharing
