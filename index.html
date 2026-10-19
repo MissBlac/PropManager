@@ -2260,12 +2260,13 @@ function showSchedule(tenantId) {
 function renderRem() {
   const tens=load(K.tens).filter(t=>t.status==='Active');
   const now=new Date(); const c=escapeHtml(cur());
+  const todayDate=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const weekEnd=new Date(todayDate.getFullYear(),todayDate.getMonth(),todayDate.getDate()+7);
   let overdue=[], soon=[], expiring=[];
   tens.forEach(t => {
     const schedule=rentPeriods(t);
-    const todayDate=new Date(now.getFullYear(),now.getMonth(),now.getDate());
     const late=schedule.filter(period=>period.balance>0&&period.due<todayDate);
-    const upcoming=schedule.filter(period=>period.balance>0&&period.due>=todayDate&&period.due<=new Date(todayDate.getFullYear(),todayDate.getMonth(),todayDate.getDate()+7));
+    const upcoming=schedule.filter(period=>period.balance>0&&period.due>=todayDate&&period.due<=weekEnd);
     if(late.length) overdue.push({...t,latePeriods:late,lateBalance:late.reduce((sum,period)=>sum+period.balance,0)});
     if(upcoming.length) soon.push({...t,upcomingPeriods:upcoming});
     const leaseEnd=parseLocalDate(t.leaseEnd); const dLeft=leaseEnd?days(todayDate,leaseEnd):null;
