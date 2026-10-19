@@ -8,7 +8,6 @@ directories:
 
 files:
   - index.html
-  - index.js
   - manifest.json
   - sw.js
   - icon.svg
