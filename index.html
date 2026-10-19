@@ -1020,7 +1020,7 @@ body.dark .ps-item{background:var(--bg)}
 // ═══════════════════════════════════════════════════════════
 // DATA LAYER
 // ═══════════════════════════════════════════════════════════
-const K = { props:'pm_props', tens:'pm_tens', pays:'pm_pays', exps:'pm_exps', maints:'pm_maints', notes:'pm_notes', sets:'pm_sets' };
+const K = { props:'pm_props', tens:'pm_tens', pays:'pm_pays', exps:'pm_exps', maints:'pm_maints', notes:'pm_notes', sets:'pm_sets', bills:'pm_bills' };
 const BACKUP_EXPORTED_KEY='pm_backup_exported_at_v1';
 const BACKUP_REMINDER_DAYS=30;
 const storageErrors = new Set();
@@ -2256,6 +2256,108 @@ function showSchedule(tenantId) {
     }).join('')}</tbody></table></div>
     <p class="fs12 c-muted" style="margin-top:10px">Remaining across lease: ${escapeHtml(cur())} ${fmt(unpaid.reduce((sum,period)=>sum+period.balance,0))} · ${unpaid.length} unpaid periods</p>`;
   container.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ═══════════════════════════════════════════════════════════
+// UTILITIES — water & electricity as their own monthly ledger.
+// Two real-world setups:
+//   · Tenant has their own meter → pays the provider directly, the
+//     landlord only records the mode for clarity (nothing tracked).
+//   · Shared / landlord meter → tenant pays the landlord a fixed
+//     monthly fee (common with water), tracked month by month here
+//     so prepaid rent never absorbs utility money.
+// ═══════════════════════════════════════════════════════════
+const UTILITIES=[
+  {kind:'water',label:'Water',icon:'💧'},
+  {kind:'power',label:'Electricity',icon:'💡'}
+];
+
+function monthOf(date){ return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0') }
+function monthOfYmd(ymd){ const d=parseLocalDate(ymd); return d?monthOf(d):'' }
+function monthLabel(ym){
+  const parts=String(ym||'').split('-');
+  if(parts.length!==2) return '';
+  const d=new Date(Number(parts[0]),Number(parts[1])-1,1);
+  return isNaN(d)?'':d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+}
+function monthsBetween(startYm,endYm){
+  const out=[]; if(!/^\d{4}-\d{2}$/.test(startYm||'')||!/^\d{4}-\d{2}$/.test(endYm||'')||startYm>endYm) return out;
+  let y=Number(startYm.slice(0,4)), m=Number(startYm.slice(5,7));
+  const endNumber=Number(endYm.slice(0,4))*100+Number(endYm.slice(5,7));
+  while(y*100+m<=endNumber&&out.length<720){ out.push(y+'-'+String(m).padStart(2,'0')); m++; if(m>12){m=1;y++} }
+  return out;
+}
+function tenantUtilityModes(t){
+  return UTILITIES.map(u=>({
+    kind:u.kind,label:u.label,icon:u.icon,
+    mode:(u.kind==='water'?t.waterMode:t.powerMode)||'none',
+    fee:Number(u.kind==='water'?t.waterFee:t.powerFee)||0
+  }));
+}
+function tenantBillableKinds(t){ return tenantUtilityModes(t).filter(u=>u.mode==='landlord'&&u.fee>0) }
+
+// Idempotent: creates one bill row per elapsed month for every
+// landlord-billed utility, keeping whatever landlords already edited.
+function accrueBills(){
+  const tens=load(K.tens); if(!tens.length) return false;
+  const currentYm=monthOf(new Date());
+  let bills=load(K.bills); let created=false;
+  const ensure=(billsArr)=>billsArr;
+  tens.forEach(t=>{
+    if(t.status!=='Active') return;
+    const startYm=monthOfYmd(t.leaseStart); if(!startYm||startYm>currentYm) return;
+    tenantBillableKinds(t).forEach(u=>{
+      monthsBetween(startYm,currentYm).forEach(ym=>{
+        if(bills.some(b=>b.tenantId===t.id&&b.kind===u.kind&&b.month===ym)) return;
+        bills.push({id:uid(),tenantId:t.id,kind:u.kind,month:ym,amount:u.fee,paid:false,paidOn:'',ref:'',createdAt:new Date().toISOString()});
+        created=true;
+      });
+    });
+  });
+  if(created){ try{ save(K.bills,bills) }catch(error){ console.error('Could not save utility bills',error); return false } }
+  return created;
+}
+function tenantBills(tenantId){ return load(K.bills).filter(b=>b.tenantId===tenantId) }
+function unpaidBillsFor(tenantId){ return tenantBills(tenantId).filter(b=>!b.paid) }
+function oweUtilitiesBills(){ return load(K.bills).filter(b=>!b.paid && load(K.tens).some(t=>t.id===b.tenantId&&t.status==='Active')) }
+function unpaidUtilitiesTotal(tenantId){ return unpaidBillsFor(tenantId).reduce((sum,b)=>sum+(Number(b.amount)||0),0) }
+function unpaidBillGroups(){
+  const activeTens=load(K.tens).filter(t=>t.status==='Active');
+  const rows=load(K.bills).filter(b=>!b.paid);
+  const groups=[];
+  activeTens.forEach(t=>{
+    const bills=rows.filter(b=>b.tenantId===t.id); if(!bills.length) return;
+    groups.push({tenant:t,bills,total:bills.reduce((sum,b)=>sum+(Number(b.amount)||0),0)});
+  });
+  groups.sort((a,b)=>b.total-a.total);
+  return groups;
+}
+function describeBillMonth(b){
+  return `${(UTILITIES.find(u=>u.kind===b.kind)||{label:b.kind}).label} · ${monthLabel(b.month)}`;
+}
+function billSummaryText(rows){
+  return UTILITIES.map(u=>{
+    const kindRows=rows.filter(b=>b.kind===u.kind);
+    if(!kindRows.length) return null;
+    const months=kindRows.map(b=>monthLabel(b.month));
+    return `${u.label} ${months.length>3?months.slice(0,3).join(', ')+' +'+(months.length-3)+' more':months.join(', ')} — ${cur()} ${fmt(kindRows.reduce((sum,b)=>sum+(Number(b.amount)||0),0))}`;
+  }).filter(Boolean).join(' · ');
+}
+function markBillsPaid(ids,{paidOn,ref}){
+  const bills=load(K.bills); const when=paidOn||today(); let changed=false;
+  bills.forEach(b=>{ if(ids.includes(b.id)&&!b.paid){ b.paid=true;b.paidOn=when;b.ref=ref||b.ref||'';changed=true } });
+  if(!changed) return false;
+  save(K.bills,bills);
+  renderDash();renderRent();renderTenants();renderRem();
+  if(document.getElementById('section-reports').classList.contains('active'))renderReports();
+  return true;
+}
+function reopenBill(id){
+  const bills=load(K.bills); const bill=bills.find(b=>b.id===id);
+  if(!bill||!bill.paid) return false;
+  bill.paid=false; bill.paidOn=''; save(K.bills,bills);
+  renderDash();renderRent();renderTenants();renderRem();
+  return true;
 }
 
 // ═══════════════════════════════════════════════════════════
