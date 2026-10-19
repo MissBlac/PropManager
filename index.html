@@ -2305,12 +2305,18 @@ function pmAlertEvents(){
   const now=new Date(); const td=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   const events=[];
   tens.forEach(t=>{
-    rentPeriods(t).forEach(p=>{
-      if(p.balance<=0) return;
-      const dd=days(td,p.due);
-      if(dd<0) events.push({key:'ov:'+t.id+':'+fmtD(p.start),kind:'overdue',tenant:t,amount:p.balance,start:p.start});
-      else if(dd<=7) events.push({key:'up:'+t.id+':'+fmtD(p.due),kind:'upcoming',tenant:t,amount:p.balance,due:p.due,daysLeft:dd});
-    });
+    // One alert per tenant per topic, aggregating every unpaid period — never a notification storm.
+    const per=rentPeriods(t).filter(p=>p.balance>0);
+    const overdue=per.filter(p=>days(td,p.due)<0);
+    const upcoming=per.filter(p=>{const dd=days(td,p.due);return dd>=0&&dd<=7});
+    if(overdue.length){
+      const earliest=overdue.reduce((a,b)=>b.due<a.due?b:a);
+      events.push({key:'ov:'+t.id,kind:'overdue',tenant:t,amount:overdue.reduce((s,p)=>s+p.balance,0),count:overdue.length,start:earliest.start});
+    }
+    if(upcoming.length){
+      const next=upcoming.reduce((a,b)=>b.due<a.due?b:a);
+      events.push({key:'up:'+t.id,kind:'upcoming',tenant:t,amount:upcoming.reduce((s,p)=>s+p.balance,0),count:upcoming.length,due:next.due,daysLeft:days(td,next.due)});
+    }
     const leaseEnd=parseLocalDate(t.leaseEnd); const dLeft=leaseEnd?days(td,leaseEnd):null;
     if(dLeft!==null&&dLeft>=0&&dLeft<=30) events.push({key:'le:'+t.id+':'+t.leaseEnd,kind:'lease',tenant:t,daysLeft:dLeft});
   });
@@ -2319,8 +2325,8 @@ function pmAlertEvents(){
 
 function pmAlertText(ev){
   const name=ev.tenant.name||'Tenant'; const c=cur(); const prop=propName(ev.tenant.propertyId);
-  if(ev.kind==='overdue') return '⚠ '+name+' — '+c+' '+fmt(ev.amount)+' overdue since '+fmtD(ev.start)+' ('+prop+')';
-  if(ev.kind==='upcoming') return ev.daysLeft===0 ? '🔔 '+name+"'s rent of "+c+' '+fmt(ev.amount)+' ('+prop+') is due today' : '🔔 '+name+"'s rent ("+prop+') is due in '+ev.daysLeft+' day(s) — '+c+' '+fmt(ev.amount);
+  if(ev.kind==='overdue') return '⚠ '+name+' — '+c+' '+fmt(ev.amount)+' overdue'+(ev.count>1?' across '+ev.count+' periods':'')+' since '+fmtD(ev.start)+' ('+prop+')';
+  if(ev.kind==='upcoming') return ev.daysLeft===0 ? '🔔 '+name+"'s rent of "+c+' '+fmt(ev.amount)+' ('+prop+') is due today' : '🔔 '+name+"'s rent of "+c+' '+fmt(ev.amount)+' ('+prop+') is due in '+ev.daysLeft+' day(s)';
   return '📋 '+name+"'s lease ("+prop+') ends in '+ev.daysLeft+' day(s) — '+fmtD(ev.tenant.leaseEnd);
 }
 
@@ -2350,16 +2356,26 @@ function pmRing(){
   }catch(error){}
   try{
     const Ctx=window.AudioContext||window.webkitAudioContext; if(!Ctx) return;
-    const ctx=new Ctx(); const t0=ctx.currentTime;
-    [[880,0],[1108.73,.16],[1318.51,.32],[1760,.5]].forEach(pair=>{
-      const o=ctx.createOscillator(),g=ctx.createGain(),f=pair[0],dt=pair[1];
-      o.type='sine'; o.frequency.value=f;
-      g.gain.setValueAtTime(.0001,t0+dt);
-      g.gain.exponentialRampToValueAtTime(.22,t0+dt+.02);
-      g.gain.exponentialRampToValueAtTime(.0001,t0+dt+.38);
-      o.connect(g); g.connect(ctx.destination); o.start(t0+dt); o.stop(t0+dt+.42);
-    });
-    setTimeout(()=>{ try{ctx.close()}catch(error){} },1100);
+    const ctx=new Ctx();
+    const play=()=>{
+      try{
+        const t0=ctx.currentTime;
+        [[880,0],[1108.73,.16],[1318.51,.32],[1760,.5]].forEach(pair=>{
+          const o=ctx.createOscillator(),g=ctx.createGain(),f=pair[0],dt=pair[1];
+          o.type='sine'; o.frequency.value=f;
+          g.gain.setValueAtTime(.0001,t0+dt);
+          g.gain.exponentialRampToValueAtTime(.22,t0+dt+.02);
+          g.gain.exponentialRampToValueAtTime(.0001,t0+dt+.38);
+          o.connect(g); g.connect(ctx.destination); o.start(t0+dt); o.stop(t0+dt+.42);
+        });
+      }catch(error){}
+      setTimeout(()=>{ try{ctx.close()}catch(error){} },1100);
+    };
+    // Chrome may hold a fresh AudioContext suspended (autoplay policy) — resume first, then schedule.
+    if(ctx.state==='suspended'){
+      const res=ctx.resume();
+      if(res&&res.then) res.then(play,()=>{ try{ctx.close()}catch(error){} }); else play();
+    } else play();
   }catch(error){}
 }
 
@@ -2374,9 +2390,9 @@ async function pmEnableNotifs(){
 
 function pmNotifBar(){
   if(!('Notification' in window)) return '';
-  const st=loadO(PM_NOTIF_KEY)||{}; const p=Notification.permission;
+  const p=Notification.permission;
   if(p==='denied') return `<div class="card" style="margin-bottom:16px;border-left:5px solid var(--bad)"><div class="card-title">🔕 Pop-up alerts are switched off on this device</div><p class="fs12 c-muted" style="margin-bottom:0">Allow notifications for PropManager in your browser or Android app settings, then reopen the app.</p></div>`;
-  if(p==='default'&&!st.enabled) return `<div class="card" style="margin-bottom:16px;border-left:5px solid var(--gold)"><div class="card-title">🔔 Get pop-up reminders that ring</div><p class="fs12 c-muted">Overdue rent, the 7-day heads-up and lease endings pop up with a chime while the app is open. Each alert has a ready-made, editable message you can copy or send to the tenant's WhatsApp.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold btn-sm" onclick="pmEnableNotifs()">Enable pop-up alerts</button><button class="btn btn-ghost btn-sm" onclick="pmRing();toast('That is the reminder chime','ok')">Hear the ring</button></div></div>`;
+  if(p==='default') return `<div class="card" style="margin-bottom:16px;border-left:5px solid var(--gold)"><div class="card-title">🔔 Get pop-up reminders that ring</div><p class="fs12 c-muted">Overdue rent, the 7-day heads-up and lease endings pop up with a chime while the app is open. Each alert has a ready-made, editable message you can copy or send to the tenant's WhatsApp.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-gold btn-sm" onclick="pmEnableNotifs()">Enable pop-up alerts</button><button class="btn btn-ghost btn-sm" onclick="pmRing();toast('That is the reminder chime','ok')">Hear the ring</button></div></div>`;
   return '';
 }
 
@@ -2394,8 +2410,8 @@ function pmBuildMessage(kind,t,data){
   if(s.businessName) tail.push(s.businessName);
   if(s.phone) tail.push(s.phone);
   const end=data.daysLeft===1?' tomorrow':data.daysLeft===0?' today':' in '+data.daysLeft+' day(s)';
-  if(kind==='overdue') return `Hello ${t.name}, greetings from ${s.businessName||'us'}. Our records show an outstanding balance of ${c} ${fmt(data.amount)} on your rent for ${prop} (period started ${fmtD(data.start)}). Kindly let us know when you plan to settle, or if there is anything you would like to discuss. Thank you!${tail.length?'\n\n— '+tail.join(' • '):''}`;
-  if(kind==='upcoming') return `Hello ${t.name}, greetings from ${s.businessName||'us'}. A friendly reminder that your rent of ${c} ${fmt(data.amount)} for ${prop} is due${end}. Kindly confirm you are aware and let us know your plans — will you be paying as usual, renewing, or would you like to talk? Thank you!${tail.length?'\n\n— '+tail.join(' • '):''}`;
+  if(kind==='overdue') return `Hello ${t.name}, greetings from ${s.businessName||'us'}. Our records show an outstanding balance of ${c} ${fmt(data.amount)} on your rent for ${prop}${data.count>1?` (${data.count} period(s) behind, since ${fmtD(data.start)})`:` (period started ${fmtD(data.start)})`}. Kindly let us know when you plan to settle, or if there is anything you would like to discuss. Thank you!${tail.length?'\n\n— '+tail.join(' • '):''}`;
+  if(kind==='upcoming') return `Hello ${t.name}, greetings from ${s.businessName||'us'}. A friendly reminder that your rent of ${c} ${fmt(data.amount)}${data.count>1?` (${data.count} period(s))`:''} for ${prop} is due${end}. Kindly confirm you are aware and let us know your plans — will you be paying as usual, renewing, or would you like to talk? Thank you!${tail.length?'\n\n— '+tail.join(' • '):''}`;
   return `Hello ${t.name}, greetings from ${s.businessName||'us'}. Your lease for ${prop} ends on ${fmtD(t.leaseEnd)} (${data.daysLeft} day(s) left). We would love to know your intentions — do you plan to renew or move out? Kindly reply in good time so we can arrange everything smoothly. Thank you!${tail.length?'\n\n— '+tail.join(' • '):''}`;
 }
 
@@ -2405,13 +2421,15 @@ function pmMsgTenant(id,kind){
   const now=new Date(); const td=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   let data=null;
   if(kind==='overdue'){
-    const p=rentPeriods(t).find(p=>p.balance>0&&days(td,p.due)<0);
-    if(!p){ toast('No overdue rent on this record yet','warn'); return }
-    data={amount:p.balance,start:p.start};
+    const per=rentPeriods(t).filter(p=>p.balance>0&&days(td,p.due)<0);
+    if(!per.length){ toast('No overdue rent on this record yet','warn'); return }
+    const earliest=per.reduce((a,b)=>b.due<a.due?b:a);
+    data={amount:per.reduce((s,p)=>s+p.balance,0),count:per.length,start:earliest.start};
   } else if(kind==='upcoming'){
-    const p=rentPeriods(t).find(p=>p.balance>0&&days(td,p.due)>=0&&days(td,p.due)<=7);
-    if(!p){ toast('No rent is due within 7 days for this tenant','warn'); return }
-    data={amount:p.balance,due:p.due,daysLeft:days(td,p.due)};
+    const per=rentPeriods(t).filter(p=>p.balance>0&&days(td,p.due)>=0&&days(td,p.due)<=7);
+    if(!per.length){ toast('No rent is due within 7 days for this tenant','warn'); return }
+    const next=per.reduce((a,b)=>b.due<a.due?b:a);
+    data={amount:per.reduce((s,p)=>s+p.balance,0),count:per.length,due:next.due,daysLeft:days(td,next.due)};
   } else {
     const le=parseLocalDate(t.leaseEnd);
     if(!le){ toast('This tenant has no lease end date','warn'); return }
@@ -2453,7 +2471,7 @@ function pmOpenWa(){
   try{ if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{}) }catch(error){}
   const wa=pmIntlPhone(_pmMsgCtx.phone);
   const url='https://wa.me/'+(wa?wa:'')+'?text='+encodeURIComponent(txt);
-  const opened=window.open(url,'_blank');
+  const opened=window.open(url,'_blank','noopener');
   if(!opened&&navigator.share){ navigator.share({text:txt}).catch(()=>{}) }
 }
 
