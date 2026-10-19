@@ -7,11 +7,15 @@ on:
         description: App version to stamp (e.g. 1.1.0). Leave empty to keep the current version.
         required: false
         default: ""
-  # Also runs automatically after changes to this workflow itself.
+  # Also runs after app-file changes and changes to this workflow itself.
   push:
     branches: [main]
     paths:
       - .github/workflows/build-apps.yml
+      - index.html
+      - index.js
+      - sw.js
+      - manifest.json
 
 env:
   CSC_IDENTITY_AUTO_DISCOVERY: "false"
