@@ -94,6 +94,9 @@ jobs:
           - Android: PropManager.apk"
           fi
           gh release view latest --repo "$GITHUB_REPOSITORY"
+
+  android:
+    name: Android APK
     runs-on: ubuntu-latest
     defaults:
       run:
