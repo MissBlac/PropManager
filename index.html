@@ -642,6 +642,10 @@ body.dark .ps-item{background:var(--bg)}
       <div class="fg"><label for="s-wallpaper-opacity">Wallpaper visibility</label><input type="range" id="s-wallpaper-opacity" min="5" max="40" value="24" oninput="setWallpaperOpacity(this.value)" onchange="saveWallpaperOpacity(this.value)"><small class="c-muted">Lower visibility keeps text readable. Wallpapers are stored only in this browser.</small></div>
     </div>
     <div class="card">
+      <div class="card-title">Alert Sound</div>
+      <div id="alert-sound-card"></div>
+    </div>
+    <div class="card">
       <div class="card-title">Data Backup & Restore</div>
       <p class="fs13 c-muted" style="margin-bottom:14px">Export your records and saved agreements as one backup. Keep backups somewhere safe; restoring replaces records and any included documents.</p>
       <p id="backup-settings-status" class="backup-status"></p>
@@ -2321,6 +2325,77 @@ function renderRem() {
 const PM_NOTIF_KEY='pm_notifs';
 let _pmMsgCtx=null;
 
+// Synthesized alert tones — no audio files to download, fully offline.
+const PM_TONES={
+  gold:   {name:'Gold Chime',  notes:[[880,0],[1108.73,.16],[1318.51,.32],[1760,.5]]},
+  kente:  {name:'Kente Bell',  notes:[[1318.51,0],[1567.98,.14],[2093,.28],[1567.98,.42]], decay:.55},
+  adinkra:{name:'Adinkra Beat',notes:[[392,0],[392,.18],[293.66,.36],[392,.54]], type:'triangle', decay:.45},
+  soft:   {name:'Soft Pulse',  notes:[[523.25,0],[659.25,.22]], decay:.7, vol:.8},
+  beep:   {name:'Sharp Beep',  notes:[[1046.5,0],[1046.5,.2],[1046.5,.4]], type:'square', vol:.6, decay:.22},
+  none:   {name:'Device default (no app chime)', notes:[]}
+};
+const pmSoundState=()=>{ const st=loadO(PM_NOTIF_KEY)||{}; const tone=PM_TONES[st.sound||'gold']||PM_TONES.gold; return {tone, volume:st.volume==null?60:Number(st.volume)} };
+// The OS toast stays quiet whenever our own chime carries the sound, so the user hears one ring, not two.
+function pmNotifSilent(){ const {tone,volume}=pmSoundState(); return tone.notes.length>0&&volume>0 }
+
+function pmChooseTone(key){
+  if(!PM_TONES[key]) return;
+  const st=loadO(PM_NOTIF_KEY)||{};
+  save(PM_NOTIF_KEY,{...st,sound:key});
+  if(key!=='none') pmRing(false); else toast('App chime off — your device notification sound will play','ok');
+  pmRenderSoundCard();
+}
+function pmSetVolume(v){
+  const st=loadO(PM_NOTIF_KEY)||{};
+  save(PM_NOTIF_KEY,{...st,volume:Math.max(0,Math.min(100,Math.round(Number(v)||0)))});
+}
+function pmPreviewTone(key){ pmRing(false,PM_TONES[key]) }
+
+function pmRing(urgent,previewTone){
+  try{ if(navigator.vibrate) navigator.vibrate(urgent?[240,110,240,110,240]:[160,90,160,90,160]); }catch(error){}
+  let tone; let volume;
+  if(previewTone){ tone=previewTone; volume=pmSoundState().volume }
+  else { const s=pmSoundState(); tone=s.tone; volume=s.volume }
+  if(!tone||!tone.notes.length||volume<=0) return;   // 'none' or muted: device/system sound only
+  const vol=Math.min(.5,.24*(tone.vol||1)*(volume/60)*(urgent?1.15:1));
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext; if(!Ctx) return;
+    const ctx=new Ctx();
+    const play=()=>{
+      try{
+        const t0=ctx.currentTime;
+        const decay=urgent?.3:(tone.decay||.38);
+        tone.notes.forEach(pair=>{
+          const o=ctx.createOscillator(),g=ctx.createGain(),f=urgent?pair[0]*.78:pair[0],dt=pair[1];
+          o.type=tone.type||'sine'; o.frequency.value=f;
+          g.gain.setValueAtTime(.0001,t0+dt);
+          g.gain.exponentialRampToValueAtTime(vol,t0+dt+.02);
+          g.gain.exponentialRampToValueAtTime(.0001,t0+dt+decay);
+          o.connect(g); g.connect(ctx.destination); o.start(t0+dt); o.stop(t0+dt+decay+.06);
+        });
+      }catch(error){}
+      setTimeout(()=>{ try{ctx.close()}catch(error){} },1500);
+    };
+    // Chrome may hold a fresh AudioContext suspended (autoplay policy) — resume first, then schedule.
+    if(ctx.state==='suspended'){
+      const res=ctx.resume();
+      if(res&&res.then) res.then(play,()=>{ try{ctx.close()}catch(error){} }); else play();
+    } else play();
+  }catch(error){}
+}
+
+function pmRenderSoundCard(){
+  const box=document.getElementById('alert-sound-card'); if(!box) return;
+  const {tone,volume}=pmSoundState();
+  const current=tone.notes.length?Object.keys(PM_TONES).find(k=>PM_TONES[k]===tone):'none';
+  const buttons=Object.keys(PM_TONES).map(k=>`<button class="btn ${k===current?'btn-gold':'btn-ghost'} btn-sm" onclick="pmChooseTone('${k}')">${PM_TONES[k].name}</button>`).join(' ');
+  box.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${buttons}</div>
+  <div class="fg"><label for="pm-alert-volume">Chime volume: <strong id="pm-alert-volume-label">${volume}</strong>%</label>
+  <input type="range" id="pm-alert-volume" min="0" max="100" value="${volume}" oninput="pmSetVolume(this.value);document.getElementById('pm-alert-volume-label').textContent=this.value"><small class="c-muted">0% mutes the app chime — your device's own notification sound still plays for pop-ups.</small></div>`;
+  const range=box.querySelector('#pm-alert-volume');
+  if(range) range.addEventListener('change',()=>pmRing(false));
+}
+
 const pmTodayKey=()=>{ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0') };
 
 function pmAlertEvents(){
@@ -2361,15 +2436,16 @@ function pmCheckNotifs(){
     if(!events.length){ if(Object.keys(last).length) save(PM_NOTIF_KEY,{last:{}}); return }
     const fresh=events.filter(ev=>last[ev.key]!==tk);
     if(!fresh.length) return;
+    const hasUrgent=fresh.some(ev=>ev.kind==='overdue');
     fresh.slice(0,8).forEach(ev=>{
       try{
-        const n=new Notification('PropManager — rent reminder',{ body:pmAlertText(ev), tag:ev.key, icon:'./icon-192.png' });
+        const n=new Notification('PropManager — rent reminder',{ body:pmAlertText(ev), tag:ev.key, icon:'./icon-192.png', silent:pmNotifSilent() });
         n.onclick=()=>{ try{n.close()}catch(error){} try{window.focus()}catch(error){} };
       }catch(error){ console.error('Could not show a pop-up alert',error) }
     });
     last[fresh[0].key]=tk; fresh.forEach(ev=>{ last[ev.key]=tk });
     save(PM_NOTIF_KEY,{last});
-    pmRing();
+    pmRing(hasUrgent);
     toast(fresh.length+' reminder alert'+(fresh.length===1?'':'s')+' shown'+(fresh.length>8?' (more are on the Reminders page)':''),'info');
   }catch(error){ console.error('Reminder alert check failed',error) }
 }
@@ -3322,6 +3398,7 @@ async function loadSettings() {
   document.getElementById('s-wallpaper-motion').checked=s.wallpaperMotion!==false;
   document.getElementById('s-wallpaper-opacity').value=Math.round((s.wallpaperOpacity??.24)*100);
   applyWallpaper(s).catch(error=>{console.error('Could not load saved wallpaper',error);toast('Could not load the saved wallpaper','err')});
+  pmRenderSoundCard();
   try {
     const url=await storedObjectUrl(s.ownerPhotoId);
     const preview=document.getElementById('owner-photo-preview'),sidebar=document.getElementById('sidebar-owner-photo');
