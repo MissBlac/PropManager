@@ -605,6 +605,7 @@ body.dark .ps-item{background:var(--bg)}
     <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
       <select id="agreement-tenant" aria-label="Tenant for lease agreement"></select>
       <button class="btn btn-gold" onclick="openAgreementSigner()">Create & Sign Agreement</button>
+      <button class="btn btn-ghost" onclick="genRentChangeAddendum()">Rent-Change Addendum</button>
       <select id="document-tenant" aria-label="Tenant for imported document"></select>
       <label class="btn btn-ghost" style="cursor:pointer">⬆ Import Signed PDF / Photo<input type="file" accept="application/pdf,image/*" style="display:none" onchange="importTenantDocument(this)"></label>
     </div>
@@ -890,7 +891,12 @@ body.dark .ps-item{background:var(--bg)}
         <div class="fg"><label>Landlord signature</label><canvas class="signature-pad" id="signature-landlord" aria-label="Landlord signature pad"></canvas><button class="btn btn-ghost btn-sm" onclick="clearSignature('signature-landlord')">Clear</button></div>
         <div class="fg"><label>Tenant signature</label><canvas class="signature-pad" id="signature-tenant" aria-label="Tenant signature pad"></canvas><button class="btn btn-ghost btn-sm" onclick="clearSignature('signature-tenant')">Clear</button></div>
       </div>
-      <div class="form-actions"><button class="btn btn-ghost" onclick="closeMod('m-agreement')">Cancel</button><button class="btn btn-gold" onclick="saveSignedAgreement()">Save Signed Agreement</button></div>
+      <div class="fg"><label>Witness signature <span class="c-muted fs11">(optional — recommended for enforceability)</span></label><canvas class="signature-pad" id="signature-witness" aria-label="Witness signature pad"></canvas><button class="btn btn-ghost btn-sm" onclick="clearSignature('signature-witness')">Clear</button></div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeMod('m-agreement')">Cancel</button>
+        <button class="btn btn-ghost" onclick="printAgreementDraft()">🖨 Print / Save as PDF</button>
+        <button class="btn btn-gold" onclick="saveSignedAgreement()">Save Signed Agreement</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1883,6 +1889,7 @@ async function saveTen() {
   } else if (leaseRenewed) {
     toast('Lease renewal detected — preparing notice…','info');
     setTimeout(()=>genLeaseRenewalNotice(ob, _origLeaseEnd, _origRent), 400);
+    setTimeout(()=>toast('You can now generate an updated agreement from Documents','ok'),1200);
   } else {
     toast('Tenant saved','ok');
   }
@@ -1910,6 +1917,63 @@ function removeTenantPhoto() {
   input.value='';input.dataset.remove='1';
   if(preview.dataset.previewUrl){URL.revokeObjectURL(preview.dataset.previewUrl);delete preview.dataset.previewUrl}
   preview.removeAttribute('src');
+}
+
+function genRentChangeAddendum() {
+  const tenantId=document.getElementById('agreement-tenant').value;
+  const tenant=load(K.tens).find(item=>item.id===tenantId);
+  if(!tenant){toast('Select a tenant first','err');return}
+  const history=Array.isArray(tenant.rentHistory)?tenant.rentHistory:[];
+  if(history.length<2){toast('No rent changes recorded for this tenant yet','warn');return}
+  const sorted=[...history].sort((a,b)=>a.effectiveDate.localeCompare(b.effectiveDate));
+  const latest=sorted[sorted.length-1];
+  const previous=sorted[sorted.length-2];
+  const s=loadO(K.sets);
+  const biz=s.businessName||'Landlord';
+  const prop=load(K.props).find(p=>p.id===tenant.propertyId);
+  const loc=`${prop?.name||''}${tenant.unit?' / '+tenant.unit:''}`;
+  const todayStr=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
+  const body=
+`AMENDMENT TO TENANCY AGREEMENT — RENT CHANGE
+
+DATE: ${todayStr}
+
+PARTIES
+Landlord: ${biz}
+Tenant:   ${tenant.name}
+Property: ${loc}
+
+This amendment records a change to the rent under the Tenancy Agreement dated ${fmtD(tenant.leaseStart)} (and any prior amendments).
+
+PREVIOUS TERMS
+  Rent: ${cur()} ${fmt(previous.rentAmount)} per ${previous.rentFrequency}
+  Effective from: ${fmtD(previous.effectiveDate)}
+
+NEW TERMS (effective ${fmtD(latest.effectiveDate)})
+  Rent: ${cur()} ${fmt(latest.rentAmount)} per ${latest.rentFrequency}
+
+All other terms of the original Tenancy Agreement remain unchanged and in full force.
+
+Both parties confirm they have read and accepted this amendment.
+
+LANDLORD: _________________________ Date: __________
+Print Name: ${biz}
+
+TENANT:   _________________________ Date: __________
+Print Name: ${tenant.name}
+
+WITNESS:  _________________________ Date: __________
+`;
+  const notes=load(K.notes);
+  const newNote={id:uid(),title:`📜 Rent-Change Addendum — ${tenant.name}`,body,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+  notes.unshift(newNote);
+  save(K.notes,notes);
+  document.getElementById('n-id').value=newNote.id;
+  document.getElementById('n-title').value=newNote.title;
+  document.getElementById('n-body').value=newNote.body;
+  document.getElementById('m-note-title').textContent='✏ Review & Save — Rent-Change Addendum';
+  openMod('m-note');
+  toast('Rent-change addendum prepared','ok');
 }
 
 function genRentIncreaseNotice(tenant, oldRent, effectiveDate=today()) {
@@ -3649,11 +3713,140 @@ function delNote(id) {
 
 let _agreementTenantId='';
 const _signedPads=new Set();
+function utilitiesClauseFor(tenant) {
+  const water=tenant.waterMode||'none', power=tenant.powerMode||'none';
+  const lines=[];
+  if(water==='landlord') lines.push(`  - Water: supplied by the Landlord under a shared meter; the Tenant pays a fixed monthly fee of ${cur()} ${fmt(tenant.waterFee||0)}, payable with rent.`);
+  else if(water==='company') lines.push('  - Water: the Tenant is responsible for opening and paying the water account directly with the provider (no charge through the Landlord).');
+  else lines.push('  - Water: not billed by the Landlord.');
+  if(power==='landlord') lines.push(`  - Electricity: supplied by the Landlord under a shared meter; the Tenant pays a fixed monthly fee of ${cur()} ${fmt(tenant.powerFee||0)}, payable with rent.`);
+  else if(power==='company') lines.push('  - Electricity: the Tenant is responsible for opening and paying the electricity account directly with the provider (e.g. ECG).');
+  else lines.push('  - Electricity: not billed by the Landlord.');
+  return lines.join('\\n');
+}
 function agreementTextFor(tenant) {
   const settings=loadO(K.sets), property=load(K.props).find(item=>item.id===tenant.propertyId);
   const period=rentPeriods(tenant);
   const total=period.reduce((sum,item)=>sum+item.amount,0);
-  return `${settings.businessName||'Landlord'} and ${tenant.name} agree to the following tenancy terms.\n\nLANDLORD\n${settings.businessName||'—'}\nPhone: ${settings.phone||'—'}\nEmail: ${settings.email||'—'}\nAddress: ${settings.address||'—'}\n\nPROPERTY\n${property?.name||'—'}${tenant.unit?` / ${tenant.unit}`:''}\n${property?.address||''}\n\nLEASE TERM\nStart: ${fmtD(tenant.leaseStart)}\nEnd: ${fmtD(tenant.leaseEnd)}\n\nRENT\nCurrent rent: ${cur()} ${fmt(tenant.rentAmount)} ${tenant.rentFrequency.toLowerCase()}\nScheduled lease value based on recorded rent changes: ${cur()} ${fmt(total)}\nSecurity deposit: ${cur()} ${fmt(tenant.deposit||0)}\n\nTENANT\n${tenant.name}\nPhone: ${tenant.phone||'—'}\nEmail: ${tenant.email||'—'}\n\nSPECIAL CONDITIONS\n${tenant.notes||'None recorded.'}\n\nThe parties confirm that they have read and accepted these terms. Each party should retain a copy of the signed agreement.\n\nLandlord: ${settings.businessName||'________________________'}\nTenant: ${tenant.name}\nDate signed: ${fmtD(today())}`;
+  const biz=settings.businessName||'Landlord';
+  const landlordAddr=settings.address||'—';
+  const landlordPhone=settings.phone||'—';
+  const landlordEmail=settings.email||'—';
+  const tenantName=tenant.name;
+  const tenantPhone=tenant.phone||'—';
+  const tenantEmail=tenant.email||'—';
+  const tenantId=tenant.nationalId||'—';
+  const prop=property?.name||'—';
+  const propAddr=property?.address||'—';
+  const unit=tenant.unit||'—';
+  const rentFreq=tenant.rentFrequency.toLowerCase();
+  const rent=`${cur()} ${fmt(tenant.rentAmount)} per ${rentFreq}`;
+  const deposit=`${cur()} ${fmt(tenant.deposit||0)}`;
+  const start=fmtD(tenant.leaseStart);
+  const end=fmtD(tenant.leaseEnd);
+  const startD=parseLocalDate(tenant.leaseStart), endD=parseLocalDate(tenant.leaseEnd);
+  let months=0;
+  if(startD&&endD){ months=(endD.getFullYear()-startD.getFullYear())*12+(endD.getMonth()-startD.getMonth()); if(months<1) months=1 }
+  const duration=months?`${months} month(s)`: 'as agreed';
+  const noticePeriod='3 months';
+  const utilities=utilitiesClauseFor(tenant);
+  const special=tenant.notes||'None recorded.';
+  return `RESIDENTIAL TENANCY AGREEMENT
+(Ghana — Rent Act 1963, Act 220)
+
+DATE: ${fmtD(today())}
+
+PARTIES
+-------
+LANDLORD: ${biz}
+Address:  ${landlordAddr}
+Phone:    ${landlordPhone}
+Email:    ${landlordEmail}
+
+TENANT:  ${tenantName}
+Ghana Card / ID: ${tenantId}
+Phone:   ${tenantPhone}
+Email:   ${tenantEmail}
+
+1. PROPERTY
+   The Landlord hereby lets to the Tenant the premises described as:
+   Property: ${prop}
+   Address:  ${propAddr}
+   Unit:     ${unit}
+
+2. TERM OF TENANCY
+   This tenancy shall commence on ${start} and shall continue for a period of ${duration}, ending on ${end}, unless earlier terminated in accordance with this Agreement.
+
+3. RENT
+   3.1 The rent shall be ${rent}.
+   3.2 Rent shall be paid in advance on or before the 1st day of each ${rentFreq}.
+   3.3 Acceptable payment methods: Cash / Mobile Money / Bank Transfer.
+   3.4 In accordance with Section 25 of the Rent Act 1963 (Act 220), the Landlord shall not demand more than six (6) months' rent in advance.
+   3.5 Scheduled lease value based on recorded rent changes: ${cur()} ${fmt(total)}.
+
+4. SECURITY DEPOSIT
+   4.1 The Tenant shall pay a security deposit of ${deposit} upon signing this Agreement.
+   4.2 The deposit shall be refunded within 30 days of the end of the tenancy, less any deductions for unpaid rent or damages beyond fair wear and tear.
+
+5. TENANT OBLIGATIONS
+   The Tenant agrees to:
+   a) Pay rent promptly on the due date.
+   b) Keep the premises clean and in good condition.
+   c) Not sublet or assign any part of the premises without the Landlord's written consent.
+   d) Not carry out structural alterations or additions without written consent.
+   e) Notify the Landlord promptly of any repairs required.
+   f) Not use the premises for any illegal or immoral purpose.
+   g) Not cause nuisance or disturbance to other occupants or neighbours.
+   h) Comply with all House Rules attached as Schedule 1.
+   i) Vacate the premises at the end of the tenancy, leaving them in good order.
+
+6. LANDLORD OBLIGATIONS
+   The Landlord agrees to:
+   a) Allow the Tenant peaceful enjoyment of the premises.
+   b) Carry out structural and major repairs in a timely manner.
+   c) Provide at least 24 hours' notice before entering the premises for inspection.
+   d) Not unlawfully evict or harass the Tenant. Forceful eviction is prohibited under the Rent Act 1963.
+   e) Issue receipts for all rent payments.
+
+7. UTILITIES & SERVICES
+${utilities}
+
+8. TERMINATION
+   8.1 Either party may terminate this Agreement by giving ${noticePeriod} written notice.
+   8.2 The Landlord may terminate immediately in cases of:
+       - Non-payment of rent for [X] months
+       - Serious breach of this Agreement
+       - Illegal use of the premises
+   8.3 Any dispute shall first be referred to the Rent Control Department before legal action.
+
+9. INSPECTION
+   The Landlord or their authorised agent may inspect the premises with 24 hours' written notice during reasonable hours.
+
+10. GOVERNING LAW
+    This Agreement is governed by the laws of Ghana, including the Rent Act 1963 (Act 220) and its amendments.
+
+SPECIAL CONDITIONS
+${special}
+
+SIGNATURES
+----------
+I/We agree to the terms of this Tenancy Agreement:
+
+LANDLORD: _________________________ Date: __________
+Print Name: ${biz}
+
+TENANT:   _________________________ Date: __________
+Print Name: ${tenantName}
+
+WITNESS:  _________________________ Date: __________
+Print Name: _______________________
+
+─────────────────────────────────────
+SCHEDULE 1 — HOUSE RULES (attached)
+
+Landlord: ${biz}
+Tenant: ${tenantName}
+Date signed: ${fmtD(today())}`;
 }
 
 function fillDocumentTenantSelects() {
@@ -3690,7 +3883,7 @@ function openAgreementSigner() {
   _agreementTenantId=tenantId;_signedPads.clear();
   document.getElementById('agreement-text').value=agreementTextFor(tenant);
   openMod('m-agreement');
-  requestAnimationFrame(()=>{setupSignaturePad('signature-landlord');setupSignaturePad('signature-tenant')});
+  requestAnimationFrame(()=>{setupSignaturePad('signature-landlord');setupSignaturePad('signature-tenant');setupSignaturePad('signature-witness')});
 }
 async function saveSignedAgreement() {
   if(!_signedPads.has('signature-landlord')||!_signedPads.has('signature-tenant')){toast('Both landlord and tenant signatures are required','err');return}
@@ -3700,11 +3893,20 @@ async function saveSignedAgreement() {
   if(!text){toast('Agreement terms cannot be empty','err');return}
   const landlord=document.getElementById('signature-landlord').toDataURL('image/png');
   const tenantSignature=document.getElementById('signature-tenant').toDataURL('image/png');
-  const html=`<!doctype html><html lang="en"><meta charset="utf-8"><title>Signed lease agreement</title><style>body{font:16px/1.55 Arial,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#222}pre{white-space:pre-wrap;font:inherit}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:36px}.signatures img{display:block;width:100%;height:120px;object-fit:contain;border-bottom:1px solid #555}</style><h1>Lease Agreement</h1><pre>${escapeHtml(text)}</pre><div class="signatures"><div><img src="${landlord}" alt="Landlord signature"><strong>Landlord signature</strong></div><div><img src="${tenantSignature}" alt="Tenant signature"><strong>Tenant signature</strong></div></div></html>`;
+  const witness=_signedPads.has('signature-witness')?document.getElementById('signature-witness').toDataURL('image/png'):'';
+  const witnessBlock=witness?`<div style="margin-top:24px"><img src="${witness}" alt="Witness signature" style="display:block;width:100%;height:90px;object-fit:contain;border-bottom:1px solid #555"><strong>Witness signature</strong></div>`:'';
+  const html=`<!doctype html><html lang="en"><meta charset="utf-8"><title>Signed lease agreement</title><style>body{font:16px/1.55 Arial,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#222}pre{white-space:pre-wrap;font:inherit}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:36px}.signatures img{display:block;width:100%;height:120px;object-fit:contain;border-bottom:1px solid #555}.disclaimer{margin-top:28px;padding:10px 12px;background:#f7f7f7;border-left:3px solid #c9a84c;font-size:12px;color:#555}</style><h1>Lease Agreement</h1><pre>${escapeHtml(text)}</pre><div class="signatures"><div><img src="${landlord}" alt="Landlord signature"><strong>Landlord signature</strong></div><div><img src="${tenantSignature}" alt="Tenant signature"><strong>Tenant signature</strong></div></div>${witnessBlock}<div class="disclaimer"><strong>Record-keeping note:</strong> This document was signed on-screen on ${escapeHtml(fmtD(today()))} and stored on the landlord's device. On-screen signatures are for record-keeping and convenience; for full legal enforceability under the Rent Act 1963 (Act 220) and other Ghanaian law, consider having the agreement witnessed in person and, where required, stamped or registered with the Rent Control Department. Keep a printed copy for both parties.</div></html>`;
   const record={id:uid(),tenantId:tenant.id,name:`${tenant.name} - Signed Lease Agreement.html`,mimeType:'text/html',kind:'signed-agreement',createdAt:new Date().toISOString(),blob:new Blob([html],{type:'text/html'})};
   try { await saveDocumentRecord(record) }
   catch(error){console.error('Could not save signed agreement',error);toast('Could not save agreement to offline storage. Export a backup or free browser storage and try again.','err');return}
   closeMod('m-agreement');renderNotes();toast('Signed agreement saved on this device','ok');
+}
+function printAgreementDraft() {
+  const text=document.getElementById('agreement-text').value.trim();
+  if(!text){toast('Agreement terms cannot be empty','err');return}
+  const tenant=load(K.tens).find(item=>item.id===_agreementTenantId);
+  const title=tenant?`Lease Agreement — ${tenant.name}`:'Lease Agreement';
+  doPrint(`<div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto"><h1 style="text-align:center">${escapeHtml(title)}</h1><pre style="white-space:pre-wrap;font:15px/1.6 Arial,sans-serif">${escapeHtml(text)}</pre><p style="margin-top:24px;font-size:11px;color:#888">Printed from PropManager · ${escapeHtml(fmtD(today()))}</p></div>`);
 }
 async function importTenantDocument(input) {
   const file=input.files?.[0];if(!file)return;
@@ -3747,7 +3949,9 @@ async function refreshAgreementsList() {
     const documents=(await allDocumentRecords()).filter(record=>['signed-agreement','imported-signed-document'].includes(record.kind)),tenants=load(K.tens);
     container.innerHTML=documents.length?`<div class="tbl-wrap"><table><thead><tr><th>Tenant</th><th>Document</th><th>Saved</th><th>Actions</th></tr></thead><tbody>${documents.map(record=>{
       const tenant=tenants.find(item=>item.id===record.tenantId);
-      return `<tr data-document-id="${escapeHtml(record.id)}"><td>${escapeHtml(tenant?.name||'Tenant removed')}</td><td>${escapeHtml(record.name)}</td><td>${escapeHtml(fmtD(record.createdAt))}</td><td><div class="row"><button class="btn btn-ghost btn-sm" onclick="downloadStoredDocument(${inlineArg(record.id)})">Download</button><button class="btn btn-ghost btn-sm" onclick="shareStoredDocument(${inlineArg(record.id)})">Share</button><button class="btn btn-red btn-sm" onclick="deleteStoredDocument(${inlineArg(record.id)})">Delete</button></div></td></tr>`;
+      const stale = record.kind==='signed-agreement' && tenant?.leaseEnd && record.createdAt && new Date(tenant.leaseEnd) > new Date(new Date(record.createdAt).getTime()+30*86400000);
+      const renewBtn = stale ? `<button class="btn btn-gold btn-sm" onclick="document.getElementById('agreement-tenant').value='${escapeHtml(record.tenantId)}';fillDocumentTenantSelects();openAgreementSigner()">Renew</button>` : '';
+      return `<tr data-document-id="${escapeHtml(record.id)}"><td>${escapeHtml(tenant?.name||'Tenant removed')}${stale?' <span class="badge b-warn" title="Lease renewed since this agreement was signed">stale</span>':''}</td><td>${escapeHtml(record.name)}</td><td>${escapeHtml(fmtD(record.createdAt))}</td><td><div class="row">${renewBtn}<button class="btn btn-ghost btn-sm" onclick="downloadStoredDocument(${inlineArg(record.id)})">Download</button><button class="btn btn-ghost btn-sm" onclick="shareStoredDocument(${inlineArg(record.id)})">Share</button><button class="btn btn-red btn-sm" onclick="deleteStoredDocument(${inlineArg(record.id)})">Delete</button></div></td></tr>`;
     }).join('')}</tbody></table></div>`:'<div class="empty" style="padding:22px 12px"><div class="ei" style="font-size:30px">📎</div><h3>No saved agreements yet</h3><p>Create an agreement to sign or import a signed PDF or photo. Saved files stay on this device.</p></div>';
   } catch(error){console.error('Could not load offline documents',error);container.textContent='Offline document storage is unavailable in this browser.'}
 }
@@ -4649,7 +4853,7 @@ function pmShowUpdateBar(){
   else renderDash();
   restoreAppAccess();
   updateNavBadges();
-  const APP_VERSION='1.2.0';
+  const APP_VERSION='1.3.0';
   try {
     const seen=localStorage.getItem('pm_version_seen');
     if(seen && seen!==APP_VERSION) setTimeout(()=>toast(`PropManager updated to v${APP_VERSION} — new features ready`,'ok'),1800);
